@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrueRate — the consensus exchange rate, with every source shown</title>
+  <meta name="description" content="Why does every website show a different dollar rate? TrueRate pulls live quotes from independent market feeds and ~100 central banks, shows the consensus rate, the full spread between sources, and how much to trust it. Free, open source, no sign-up.">
+  <link rel="canonical" href="https://truerate.pages.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="TrueRate — one honest exchange rate, every source shown">
+  <meta property="og:description" content="Consensus rate across market feeds and central banks, with the spread and a confidence score. USD, PKR, EUR, GBP, SAR, AED, INR and 160 more.">
+  <meta name="twitter:card" content="summary">
+  <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"TrueRate","applicationCategory":"FinanceApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0"},"description":"Consensus currency exchange rates aggregated from independent market feeds and central banks, with the spread between sources shown."}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/" aria-label="TrueRate home">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--accent)"/><path d="M9 20.5l4.5-6 3.5 4 6-8" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>TrueRate</span>
+    </a>
+    <nav class="nav">
+      <a href="#sources">Sources</a>
+      <a href="#all">All currencies</a>
+      <a href="#api">API</a>
+      <a href="#method">Method</a>
+      <a href="https://github.com/Hassan-Memon/truerate" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>One honest rate. Every source shown.</h1>
+      <p class="lede">Every site quotes a different number for the dollar. TrueRate asks <span id="src-count">several</span> independent market feeds and <span id="bank-count">~100</span> central banks at once, then shows you the consensus, the disagreement, and how much to trust it.</p>
+
+      <form class="converter card" id="converter" autocomplete="off">
+        <div class="field amount">
+          <label for="amount">Amount</label>
+          <input id="amount" name="amount" type="text" inputmode="decimal" value="1" aria-describedby="result">
+        </div>
+        <div class="field">
+          <label for="from">From</label>
+          <select id="from" name="from"></select>
+        </div>
+        <button type="button" class="swap" id="swap" aria-label="Swap currencies" title="Swap">⇄</button>
+        <div class="field">
+          <label for="to">To</label>
+          <select id="to" name="to"></select>
+        </div>
+      </form>
+
+      <div class="card result-card" id="result-card" aria-live="polite">
+        <div class="result" id="result">
+          <div class="big skeleton">&nbsp;</div>
+        </div>
+        <div class="unit" id="unit"></div>
+        <div class="band" id="band"></div>
+        <div class="official-line" id="official-line"></div>
+        <div class="confidence" id="confidence"></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-head">
+          <h2 id="chart-title">History</h2>
+          <div class="ranges" role="group" aria-label="History range">
+            <button type="button" data-days="7">7d</button>
+            <button type="button" data-days="30" class="on">30d</button>
+            <button type="button" data-days="90">90d</button>
+            <button type="button" data-days="365">1y</button>
+            <button type="button" data-days="1825">5y</button>
+          </div>
+        </div>
+        <div class="chart" id="chart"></div>
+        <p class="chart-note">Daily official reference rates (central-bank consensus via Frankfurter). Hover or touch for the value on a day.</p>
+      </div>
+    </section>
+
+    <section id="sources" class="section">
+      <h2>Where this number comes from</h2>
+      <p class="muted" id="sources-intro"></p>
+      <div class="two-col">
+        <div class="card">
+          <h3>Market feeds <span class="pill" id="market-n"></span></h3>
+          <p class="muted small">Live mid-market aggregators. The consensus rate above is the median of these.</p>
+          <table class="tbl" id="market-table"><thead><tr><th>Source</th><th class="num">Rate</th><th class="num">vs consensus</th><th>As of</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div class="card">
+          <h3>Central banks <span class="pill" id="bank-n"></span></h3>
+          <p class="muted small">Official reference rates published by monetary authorities. Slower, but authoritative.</p>
+          <table class="tbl" id="bank-table"><thead><tr><th>Institution</th><th class="num">Rate</th><th class="num">vs official</th><th>Date</th></tr></thead><tbody></tbody></table>
+          <button type="button" class="link" id="bank-more" hidden></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="all" class="section">
+      <div class="section-head">
+        <h2>All currencies against <span id="all-base">USD</span></h2>
+        <input id="search" type="search" placeholder="Search currency or code" aria-label="Search currencies">
+      </div>
+      <div class="card">
+        <table class="tbl all" id="all-table">
+          <thead><tr><th>Currency</th><th class="num">1 <span class="all-base">USD</span> =</th><th class="num">Spread</th><th class="num">Official</th><th>Trust</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="api" class="section">
+      <h2>Free JSON API</h2>
+      <p class="muted">The same data this page uses, no key required. Please cache on your side; responses are good for five minutes.</p>
+      <div class="card">
+        <pre><code id="api-example">GET /api/pair?from=USD&amp;to=PKR
+GET /api/convert?from=USD&amp;to=PKR&amp;amount=100
+GET /api/rates?base=PKR
+GET /api/history?from=USD&amp;to=PKR&amp;days=90</code></pre>
+      </div>
+    </section>
+
+    <section id="method" class="section">
+      <h2>How TrueRate decides</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3>Why rates differ everywhere</h3>
+          <p>There is no single "true" exchange rate. Banks trade with each other at the <strong>interbank</strong> rate. A money changer quotes a <strong>buying</strong> and a <strong>selling</strong> rate on either side of it. Central banks publish an <strong>official reference</strong> once a day. Websites copy one of these, at different times, and round differently.</p>
+          <p>So instead of pretending to know the exact number, TrueRate shows the <strong>consensus</strong> and the <strong>spread</strong>. If sources agree within 0.2%, the number is solid. If they disagree by 3%, you deserve to know that before you move money.</p>
+        </div>
+        <div class="card">
+          <h3>The rules</h3>
+          <ol class="rules">
+            <li><strong>Consensus</strong> = median of the live market feeds. A median ignores one bad feed.</li>
+            <li><strong>Range</strong> = lowest to highest feed, shown as a percentage spread.</li>
+            <li><strong>Official</strong> = Frankfurter's consensus of central-bank quotes, plus the issuing bank's own figure when it exists, even if it is days old (marked stale).</li>
+            <li><strong>Trust score</strong> starts at 100 and loses points for few sources, wide spread, a gap between market and official, and stale data.</li>
+            <li>Cross rates (say PKR→SAR) are built per source, so each source's own internal consistency is kept.</li>
+          </ol>
+          <p class="small muted">Street (kerb) rates from money changers are not in any free public feed yet. When one appears, it will be added as its own tier.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p id="updated" class="muted small"></p>
+    <p class="small muted">Data: <a href="https://www.exchangerate-api.com/docs/free" rel="noopener">ExchangeRate-API</a>, <a href="https://github.com/fawazahmed0/exchange-api" rel="noopener">Currency-API</a>, <a href="https://www.floatrates.com/" rel="noopener">FloatRates</a>, <a href="https://moneyconvert.net/" rel="noopener">MoneyConvert</a>, and ~100 central banks via <a href="https://frankfurter.dev/" rel="noopener">Frankfurter</a>. Not financial advice. Rates are informational; the rate you get from a bank or money changer will differ.</p>
+    <p class="small muted">TrueRate is open source under the MIT licence. <a href="https://github.com/Hassan-Memon/truerate" rel="noopener">Contribute a source</a>.</p>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

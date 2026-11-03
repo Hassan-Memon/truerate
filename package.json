@@ -1,0 +1,17 @@
+{
+  "name": "truerate",
+  "version": "0.1.0",
+  "description": "Consensus exchange rates built from many independent sources, with the spread shown instead of hidden.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/",
+    "currencies": "node scripts/build-currencies.mjs",
+    "deploy": "npx wrangler@4 deploy",
+    "preview": "npx wrangler@4 dev"
+  },
+  "license": "MIT"
+}

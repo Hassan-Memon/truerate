@@ -1,0 +1,13 @@
+name = "truerate"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[observability]
+enabled = true
