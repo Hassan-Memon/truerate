@@ -12,6 +12,9 @@ export const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
 const HISTORY_TTL_MS = 60 * 60 * 1000;
 const cache = new TtlCache();
 
+/** Tests only: forget every cached upstream response. */
+export function resetCache() { cache.clear(); }
+
 export async function getSnapshot(opts = {}) {
   return cache.get('snapshot', async () => {
     const [market, official] = await Promise.all([loadMarketSources(opts), loadOfficial(opts)]);

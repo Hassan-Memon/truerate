@@ -42,11 +42,17 @@ async function api(path) {
   return body;
 }
 
+/* Storage can be blocked (private mode, sandboxed iframes): never let it break the page. */
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
 function readUrl() {
   const q = new URLSearchParams(location.search);
   const code = (v) => (v && /^[a-z]{3}$/i.test(v) ? v.toUpperCase() : null);
-  state.from = code(q.get('from')) ?? localStorage.getItem('tr.from') ?? 'USD';
-  state.to = code(q.get('to')) ?? localStorage.getItem('tr.to') ?? 'PKR';
+  state.from = code(q.get('from')) ?? code(store.get('tr.from')) ?? 'USD';
+  state.to = code(q.get('to')) ?? code(store.get('tr.to')) ?? 'PKR';
   const a = parseFloat(q.get('amount'));
   state.amount = Number.isFinite(a) && a >= 0 ? a : 1;
 }
@@ -54,7 +60,7 @@ function writeUrl() {
   const q = new URLSearchParams({ from: state.from, to: state.to });
   if (state.amount !== 1) q.set('amount', String(state.amount));
   history.replaceState(null, '', `?${q}`);
-  try { localStorage.setItem('tr.from', state.from); localStorage.setItem('tr.to', state.to); } catch {}
+  store.set('tr.from', state.from); store.set('tr.to', state.to);
   document.title = `${state.from} to ${state.to} · ${state.pair ? fmtRate(state.pair.rate) : ''} · TrueRate`;
 }
 
@@ -114,6 +120,8 @@ function renderResult() {
   if (o) {
     const homes = (o.homes ?? []).map((h) => `${esc(h.name)}: <b>${fmtRate(h.rate)}</b> <span class="${h.stale ? 'stale' : 'muted small'}">(${fmtDate(h.date)}${h.stale ? ', stale' : ''})</span>`).join(' · ');
     $('#official-line').innerHTML = `Central banks (${o.nIncluded} of ${o.n} institutions): <b>${fmtRate(o.rate)}</b> <span class="muted small">(${fmtDate(o.date)}, ${fmtPct(d.gapPct)} vs market)</span>${homes ? '<br>' + homes : ''}`;
+  } else if (d.feeds && !d.feeds.official) {
+    $('#official-line').textContent = 'The central-bank feed is not responding right now; showing market feeds only.';
   } else {
     $('#official-line').textContent = 'No central-bank quote available for this pair.';
   }
@@ -136,6 +144,7 @@ function renderSources() {
     .join('') || '<tr><td colspan="4" class="muted">No market feed carries this pair.</td></tr>';
 
   const o = d.official;
+  const bankEmpty = d.feeds && !d.feeds.official ? 'The central-bank feed is not responding right now.' : 'No central bank publishes this pair.';
   $('#bank-n').textContent = o ? `${o.n} institutions` : '0';
   const rows = [...(o?.homes ?? []).filter((h) => h.stale).map((h) => ({ ...h, home: true })), ...(o?.quotes ?? []).map((q) => ({ ...q, home: (o.homes ?? []).some((h) => h.key === q.key) }))];
   const more = $('#bank-more');
@@ -144,7 +153,7 @@ function renderSources() {
     $('#bank-table tbody').innerHTML = list.map((q) => {
       const flag = q.country ? countryFlag(q.country) : '';
       return `<tr><td>${flag} ${esc(q.name)}${q.home ? ' <span class="pill">issuer</span>' : ''}${q.excluded ? '<span class="ex">outlier</span>' : ''}${q.stale ? '<span class="ex stale">stale</span>' : ''}<div class="name">${esc(q.rateType ?? '')}</div></td><td class="num">${fmtRate(q.rate)}</td><td class="num dev ${Math.abs(q.devPct ?? 0) > 1 ? 'far' : ''}">${q.devPct == null ? '—' : fmtPct(q.devPct)}</td><td class="name">${fmtDate(q.date)}</td></tr>`;
-    }).join('') || '<tr><td colspan="4" class="muted">No central bank publishes this pair.</td></tr>';
+    }).join('') || `<tr><td colspan="4" class="muted">${bankEmpty}</td></tr>`;
     more.hidden = rows.length <= 8;
     more.textContent = all ? 'Show fewer' : `Show all ${rows.length} institutions`;
     more.onclick = () => render(!all);
@@ -173,6 +182,7 @@ function renderChart() {
   const host = $('#chart');
   const h = state.history;
   $('#chart-title').textContent = `${state.from} → ${state.to}, last ${state.days >= 365 ? Math.round(state.days / 365) + ' year' + (state.days >= 730 ? 's' : '') : state.days + ' days'}`;
+  if (state.historyError) { host.innerHTML = '<div class="empty">History is temporarily unavailable (the central-bank feed did not respond). Try again in a few minutes.</div>'; return; }
   if (!h || h.points.length < 2) { host.innerHTML = '<div class="empty">No history for this pair.</div>'; return; }
   const W = host.clientWidth || 600, H = host.clientHeight || 220;
   const P = { l: 54, r: 12, t: 12, b: 24 };
@@ -217,10 +227,11 @@ function renderChart() {
 
 /* ---------- loading ---------- */
 let seq = 0;
-async function loadPair() {
+/** @param {{quiet?: boolean}} [o] quiet = background refresh: keep the current numbers on screen until new ones arrive. */
+async function loadPair({ quiet = false } = {}) {
   const my = ++seq;
   const { from, to } = state;
-  $('#result').innerHTML = '<div class="big skeleton">&nbsp;</div>';
+  if (!quiet) $('#result').innerHTML = '<div class="big skeleton">&nbsp;</div>';
   try {
     const [pair, table] = await Promise.all([api(`/api/pair?from=${from}&to=${to}`), api(`/api/rates?base=${from}`)]);
     if (my !== seq) return;
@@ -230,7 +241,10 @@ async function loadPair() {
     $('#updated').textContent = `Rates generated ${new Date(pair.generatedAt).toLocaleString()} · refreshes every 5 minutes · ${pair.market ? pair.market.n : 0} market feeds, ${pair.official ? pair.official.n : 0} central banks for this pair.`;
   } catch (err) {
     if (my !== seq) return;
+    if (quiet && state.pair) return; // a failed background refresh keeps the last good numbers
+    state.pair = null;
     $('#result').innerHTML = `<div class="alert">Could not load ${from}/${to}: ${esc(err.message)}</div>`;
+    ['#unit', '#band', '#official-line', '#confidence'].forEach((s) => { $(s).textContent = ''; });
   }
   loadHistory();
 }
@@ -239,9 +253,12 @@ async function loadHistory() {
   const { from, to, days } = state;
   try {
     const h = await api(`/api/history?from=${from}&to=${to}&days=${days}`);
-    if (my !== seq) return;
-    state.history = h;
-  } catch { state.history = null; }
+    if (my !== seq || days !== state.days) return;
+    state.history = h; state.historyError = null;
+  } catch (err) {
+    if (my !== seq || days !== state.days) return;
+    state.history = null; state.historyError = err.message;
+  }
   renderChart();
 }
 
@@ -249,7 +266,8 @@ async function init() {
   readUrl();
   try {
     const meta = await api('/api/currencies');
-    state.currencies = meta.currencies;
+    // The API keys entries by code; carry the code inside each entry so sorting/rendering can use it.
+    state.currencies = Object.fromEntries(Object.entries(meta.currencies).map(([code, c]) => [code, { ...c, code }]));
   } catch (err) {
     $('#result').innerHTML = `<div class="alert">The rate service is unreachable: ${esc(err.message)}</div>`;
     return;
@@ -258,8 +276,12 @@ async function init() {
   if (!state.currencies[state.to]) state.to = state.from === 'PKR' ? 'USD' : 'PKR';
   fillSelects();
   $('#amount').value = String(state.amount);
-  $('#src-count').textContent = 'four';
-  api('/api/sources').then((s) => { $('#bank-count').textContent = String(s.providerCount); }).catch(() => {});
+  api('/api/sources').then((s) => {
+    const live = s.sources.filter((x) => x.kind === 'market' && x.ok).length;
+    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    $('#src-count').textContent = words[live] ?? String(live);
+    if (s.providerCount) $('#bank-count').textContent = String(s.providerCount);
+  }).catch(() => {});
 
   $('#from').addEventListener('change', (e) => { state.from = e.target.value; loadPair(); });
   $('#to').addEventListener('change', (e) => { state.to = e.target.value; loadPair(); });
@@ -282,7 +304,11 @@ async function init() {
     state.days = Number(b.dataset.days); loadHistory();
   }));
   window.addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(renderChart, 150); });
-  setInterval(loadPair, REFRESH_MS);
+  setInterval(() => loadPair({ quiet: true }), REFRESH_MS);
   loadPair();
 }
-init();
+init().catch((err) => {
+  // Surface anything unexpected instead of failing silently as an unhandled rejection.
+  console.error(err);
+  $('#result').innerHTML = `<div class="alert">TrueRate failed to start: ${esc(err?.message || err)}</div>`;
+});

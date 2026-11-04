@@ -2,9 +2,25 @@
 
 **One honest exchange rate, with every source shown.**
 
-Every website quotes a different number for the dollar. Interbank, buying, selling, official, open market: they are all different rates, copied at different times and rounded differently. TrueRate does not pretend there is one exact number. It asks many independent sources at once, shows the **consensus**, the **spread** between them, the **official central-bank** view, and a **trust score**.
+## The problem
 
-- Zero runtime dependencies (plain Node 20+ or Cloudflare Workers).
+> **Money is property, and every property deserves an evaluation people can see.**
+> We expect to know how land, cars, gold and companies are valued. A currency is valued every day too, yet most people only ever see a number with no name, no method and no time attached. Every website shows a different dollar rate, and nobody tells you **who decided it, how, and when**.
+>
+> **TrueRate exists to bring that process into the light:** for every currency, show who actually sets the rate, where they publish it, how it is calculated in their own words, and how each number you are quoted relates to the price where currency really changes hands.
+
+What we found (details and sources in [`docs/research.md`](docs/research.md)):
+
+- **Who decides.** Nobody, for a floating currency: the rate is the price at which banks actually trade. A managed float (PKR, INR) is the same, except the central bank steps in to calm the market. A peg (SAR 3.75, AED 3.6725, HKD 7.75–7.85) is decided by the state, by policy.
+- **There is a chain of rates, not one rate.** USD/PKR on 4 Nov 2026: interbank closing **276.70** → banks to customers **276.39 / 276.85** → open market (cash) **277.35 / 278.48**. All three are published daily by the State Bank of Pakistan. "Every site shows a different rate" is mostly sites showing different steps of this chain.
+- **What is still hidden.** Individual trades. Currency trading is about $9.6 trillion a day on private bank platforms; only end-of-day averages are made public.
+- **Our own weak point.** TrueRate's consensus today is the median of four free aggregators that do not publish their methods. The goal is to rank every number by **how close it is to a real trade** and **whether its method is published**, and to anchor on primary sources (central banks, official fixings) wherever they exist.
+
+## What the site does today
+
+TrueRate does not pretend there is one exact number. It asks many independent sources at once, shows the **consensus**, the **spread** between them, the **official central-bank** view, and a **trust score**.
+
+- Zero runtime dependencies (plain Node 22+ or Cloudflare Workers).
 - Zero API keys. Every upstream is free and public.
 - Zero hosting cost on the Cloudflare Workers free plan.
 
@@ -23,10 +39,15 @@ Consensus = median of market feeds. Cross pairs (PKR→SAR) are built per source
 
 ## Run locally
 
+Requires Node 22+.
+
 ```bash
 node src/server.js          # http://localhost:3000
-npm test                    # node --test (tests still to be written)
+npm test                    # 66 offline tests (node --test), fixtures in test/fixtures/
+npm run preview             # same app inside the real Workers runtime (wrangler dev)
 ```
+
+If an upstream is down the site keeps working: a dead market feed is dropped from the median, and if the central-bank feed (Frankfurter) is down the page says so and shows market feeds only. `/api/pair` reports this as `feeds: { market, marketTotal, official }`.
 
 ## API
 
@@ -59,17 +80,29 @@ public/                index.html, app.js, styles.css (no build step)
 scripts/build-currencies.mjs   regenerates src/core/currencies.json (166 fiat currencies)
 ```
 
-## Status (2026-11-03)
+## Status (2026-11-04)
 
-Done and verified against live upstreams:
-- Backend complete: all endpoints return correct data, including USD/PKR with 4 feeds + 19 banks and the SBP stale fallback.
-- Frontend written: converter, range strip, trust badge, source tables, all-currencies table, history chart with hover.
+Done and verified:
+- Backend: all endpoints, verified live with 4 market feeds (USD/PKR) and earlier with 19 central banks + the SBP stale fallback.
+- Frontend: converter, range strip, trust badge, source tables, all-currencies table, history chart. Checked in a headless browser at desktop and phone widths (no horizontal scroll). The earlier "did not mount" bug was real: `/api/currencies` entries carry no `code` field, so `fillSelects()` threw inside `init()` as a silent unhandled rejection. Fixed, and `init()` now reports startup errors on the page.
+- `ratesTable` (`/api/rates?base=…`) now computes spread, trust and official columns for the actual cross pair; previously a non-USD base showed each currency's USD figures, and mixed market and official rates when the base had no central bank.
+- Node server: a malformed URL (`/%E0%A4%A`) used to crash the process via an unhandled rejection; it now returns 400.
+- Tests: 66 offline tests across stats, cache, adapters, aggregation, API routes and the static server. `.github/workflows/ci.yml` runs them on Node 22 and 24 and checks that the Worker bundles.
+- Worker: `wrangler deploy --dry-run` bundles cleanly (JSON import included) and `wrangler dev` serves pages and API correctly.
+
+Next, the core of the mission (see [`docs/research.md`](docs/research.md)):
+1. **Rate ladder** per pair: interbank → bank buy/sell → open market → what you pay, each with publisher, method in their own words, time and a link to the original document.
+2. **SBP adapter** (Pakistan first): interbank revaluation rates (~40 currencies), bank customer buy/sell (10), ECAP open market (6). The PDFs contain plain text that can be read without libraries; take their links from the `economic-data` page rather than guessing file names.
+3. **"Who decides this currency"** card: floating / managed / peg, the decider, peg value and since when, link to the central bank's statement. Only cited facts; "not yet documented" otherwise.
+4. **Peg check**: distance of the market from the official peg.
+5. **Source grading**: primary vs secondary, method published or not; anchor the consensus on primary sources.
+6. Add other countries' official publishers one by one.
 
 Open:
-1. **Frontend did not mount in the headless QA browser** (no console errors, API reachable, `app.js` served as a module). Open `http://localhost:3000` in a normal browser and check DevTools; if it works there, the headless tool is the issue, otherwise fix `public/app.js` `init()`.
-2. Write `test/` (node --test) for `aggregate.js` with fixtures; CI workflow runs `npm test`.
-3. `npx wrangler@4 dev` once to confirm the Worker bundles the JSON import, then deploy.
-4. Create the GitHub remote: `gh repo create truerate --public --source . --push`.
+1. Deploy: `npx wrangler@4 login && npm run deploy` (needs your Cloudflare account). Watch CPU time on the free plan (10 ms per request): parsing the full Frankfurter `expand=providers` response is the heaviest step and only happens once per 5-minute snapshot per isolate.
+2. Create the GitHub remote: `gh repo create truerate --public --source . --push`. To auto-deploy from Actions, set `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` secrets and a `DEPLOY_ENABLED=true` repository variable.
+3. The canonical URL in `public/index.html` points at `truerate.pages.dev`; change it to the real deployed URL.
+4. History relies on Frankfurter alone; when it is down the chart says so. A second history source would remove that single point of failure.
 5. Later: Urdu/RTL toggle, street-rate tier when a public feed exists, embed widget.
 
 MIT licence. Rates are informational, not financial advice.

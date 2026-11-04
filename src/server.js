@@ -19,7 +19,8 @@ const TYPES = {
 };
 
 async function serveStatic(pathname, res) {
-  let rel = decodeURIComponent(pathname);
+  let rel;
+  try { rel = decodeURIComponent(pathname); } catch { res.writeHead(400, { 'content-type': 'text/plain' }); return res.end('bad request'); }
   if (rel.endsWith('/')) rel += 'index.html';
   const file = normalize(join(PUBLIC, rel));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
@@ -42,10 +43,10 @@ async function serveStatic(pathname, res) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+async function handle(req, res) {
+  const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/api')) {
-    const request = new Request(url, { method: req.method, headers: req.headers });
+    const request = new Request(url, { method: req.method });
     const out = await handleApi(request);
     const headers = Object.fromEntries(out.headers);
     const body = Buffer.from(await out.arrayBuffer());
@@ -53,6 +54,14 @@ const server = http.createServer(async (req, res) => {
     return res.end(req.method === 'HEAD' ? undefined : body);
   }
   return serveStatic(url.pathname, res);
+}
+
+export const server = http.createServer((req, res) => {
+  handle(req, res).catch((err) => {
+    console.error(err);
+    if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
+    res.end('internal error');
+  });
 });
 
 server.listen(PORT, HOST, () => console.log(`TrueRate listening on http://localhost:${PORT}`));

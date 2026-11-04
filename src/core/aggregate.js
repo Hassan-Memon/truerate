@@ -118,6 +118,7 @@ export function buildSnapshot({ market, official, now = Date.now() }) {
   return {
     base: 'USD',
     generatedAt: new Date(now).toISOString(),
+    feeds: { market: okMarket.length, marketTotal: market.length, official: !!official.ok },
     sources,
     providerCount: Object.keys(providers).length,
     providers,
@@ -189,28 +190,42 @@ export function pairDetail(snapshot, from, to) {
     from: strip(a), to: strip(b),
     rate: sig(rate, 8), inverse: sig(1 / rate, 8),
     market: mv, official: ov, gapPct, confidence,
+    feeds: snapshot.feeds ?? null,
     generatedAt: snapshot.generatedAt,
   };
 }
 
-/** Compact per-currency table rebased to any currency. */
+/** Tables are pure functions of (snapshot, base); remember them for the snapshot's lifetime. */
+const tableMemo = new WeakMap();
+
+/**
+ * Compact per-currency table rebased to any currency. Every column is computed for the
+ * actual cross pair (base → code), the same way pairDetail does it, not copied from the USD view.
+ */
 export function ratesTable(snapshot, base = 'USD') {
-  const b = snapshot.currencies[base];
-  if (!b) return null;
+  if (!snapshot.currencies[base]) return null;
+  let memo = tableMemo.get(snapshot);
+  if (!memo) { memo = new Map(); tableMemo.set(snapshot, memo); }
+  if (memo.has(base)) return memo.get(base);
+
   const rates = {};
   for (const c of Object.values(snapshot.currencies)) {
+    const d = pairDetail(snapshot, base, c.code);
+    if (!d) continue;
     rates[c.code] = {
       code: c.code, name: c.name, symbol: c.symbol, flag: c.flag,
-      rate: sig(c.rate / b.rate, 8),
-      spreadPct: c.market?.spreadPct ?? null,
-      sources: c.market?.n ?? 0,
-      official: c.official ? sig(c.official.rate / (b.official?.rate ?? b.rate), 8) : null,
-      officialDate: c.official?.date ?? null,
-      banks: c.official?.n ?? 0,
-      gapPct: c.gapPct,
-      confidence: c.confidence.label,
-      score: c.confidence.score,
+      rate: d.rate,
+      spreadPct: d.market?.spreadPct ?? null,
+      sources: d.market?.n ?? 0,
+      official: d.official?.rate ?? null,
+      officialDate: d.official?.date ?? null,
+      banks: d.official?.n ?? 0,
+      gapPct: d.gapPct,
+      confidence: d.confidence.label,
+      score: d.confidence.score,
     };
   }
-  return { base, generatedAt: snapshot.generatedAt, rates };
+  const table = { base, generatedAt: snapshot.generatedAt, rates };
+  memo.set(base, table);
+  return table;
 }
