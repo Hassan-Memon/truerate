@@ -65,7 +65,7 @@ Responses are cached five minutes in memory and carry `Cache-Control` so the edg
 
 1. Create a free Cloudflare account (no card needed).
 2. `npx wrangler@4 login` then `npm run deploy`. You get `https://truerate.<you>.workers.dev`.
-3. Or set the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets on the GitHub repo and push to `main`; `.github/workflows/deploy.yml` deploys automatically.
+3. Or deploy from CI: set the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets on the `production` environment, set the repository variable `DEPLOY_ENABLED=true`, and push to `master`. Deploy is off until you do — see [`docs/security.md`](docs/security.md#cicd) for the minimum token scope.
 
 Any Node host (Render, Fly, Railway free tiers) also works: `PORT=8080 node src/server.js`.
 
@@ -100,9 +100,13 @@ Next, the core of the mission (see [`docs/research.md`](docs/research.md)):
 
 Open:
 1. Deploy: `npx wrangler@4 login && npm run deploy` (needs your Cloudflare account). Watch CPU time on the free plan (10 ms per request): parsing the full Frankfurter `expand=providers` response is the heaviest step and only happens once per 5-minute snapshot per isolate.
-2. Create the GitHub remote: `gh repo create truerate --public --source . --push`. To auto-deploy from Actions, set `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` secrets and a `DEPLOY_ENABLED=true` repository variable.
+2. To auto-deploy from Actions: set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` on the `production` environment, then `gh variable set DEPLOY_ENABLED --body true`. See [`docs/security.md`](docs/security.md#cicd).
 3. The canonical URL in `public/index.html` points at `truerate.pages.dev`; change it to the real deployed URL.
 4. History relies on Frankfurter alone; when it is down the chart says so. A second history source would remove that single point of failure.
 5. Later: Urdu/RTL toggle, street-rate tier when a public feed exists, embed widget.
+
+## Security
+
+The app ships no dependencies, no API keys, and no cookies, and every upstream URL is hardcoded. Repository controls — secret scanning with push protection, Dependabot, branch protection on `master`, least-privilege `GITHUB_TOKEN`, SHA-pinned actions, and security headers applied by both runtimes — are documented with verification commands in [`docs/security.md`](docs/security.md). Report vulnerabilities privately via [`SECURITY.md`](SECURITY.md).
 
 MIT licence. Rates are informational, not financial advice.

@@ -73,3 +73,19 @@ test('API is routed through the shared handler', async () => {
   assert.equal(r.status, 204);
   assert.equal(r.headers.get('access-control-allow-origin'), '*');
 });
+
+test('every response carries the security headers', async () => {
+  for (const path of ['/', '/app.js', '/api/health', '/nope.png']) {
+    const r = await fetch(base + path);
+    await r.arrayBuffer();
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', path);
+    assert.equal(r.headers.get('x-frame-options'), 'DENY', path);
+    assert.equal(r.headers.get('referrer-policy'), 'strict-origin-when-cross-origin', path);
+    assert.match(r.headers.get('strict-transport-security') ?? '', /max-age=31536000/, path);
+    const csp = r.headers.get('content-security-policy') ?? '';
+    assert.match(csp, /default-src 'self'/, path);
+    assert.match(csp, /frame-ancestors 'none'/, path);
+    assert.match(csp, /script-src 'self'(;|$)/, `${path} script-src must stay strict`);
+    assert.ok(!/script-src[^;]*unsafe-(inline|eval)/.test(csp), `${path} script-src allows inline or eval`);
+  }
+});

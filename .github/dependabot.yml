@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Actions are SHA-pinned, so keep them current automatically. Dependabot
+  # rewrites the pin and the `# vX.Y.Z` comment in the same commit.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']

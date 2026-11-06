@@ -1,18 +1,36 @@
 name: Deploy to Cloudflare Workers
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
+
+# Least privilege at the workflow level; the deploy job adds nothing, because
+# Cloudflare auth comes from its own API token, not from GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Opt-in switch: a merge to master never deploys until you set
+    #   gh variable set DEPLOY_ENABLED --body true
     if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm test --if-present
-      - uses: cloudflare/wrangler-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: npm test
+      - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Pinned exactly, for the same reason as in ci.yml.
+          wranglerVersion: '4.158.0'

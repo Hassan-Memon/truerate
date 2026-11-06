@@ -3,6 +3,7 @@
  * /api/* runs the same handler as the Node server. Fits inside the free plan.
  */
 import { handleApi } from './api.js';
+import { withSecurityHeaders } from './core/headers.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -14,10 +15,10 @@ export default {
         const hit = await cache.match(key);
         if (hit) return hit;
       }
-      const res = await handleApi(request);
+      const res = withSecurityHeaders(await handleApi(request));
       if (request.method === 'GET' && res.status === 200) ctx.waitUntil(cache.put(key, res.clone()));
       return res;
     }
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await env.ASSETS.fetch(request));
   },
 };

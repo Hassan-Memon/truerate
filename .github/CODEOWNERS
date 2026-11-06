@@ -1,0 +1,8 @@
+# Every change to a protected path needs the maintainer's review.
+*                       @Hassan-Memon
+
+# Workflows and deploy config can run code with repository credentials.
+/.github/               @Hassan-Memon
+/wrangler.toml          @Hassan-Memon
+/src/core/headers.js    @Hassan-Memon
+/SECURITY.md            @Hassan-Memon
