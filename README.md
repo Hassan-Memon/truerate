@@ -43,7 +43,7 @@ Requires Node 22+.
 
 ```bash
 node src/server.js          # http://localhost:3000
-npm test                    # 66 offline tests (node --test), fixtures in test/fixtures/
+npm test                    # 67 offline tests (node --test), fixtures in test/fixtures/
 npm run preview             # same app inside the real Workers runtime (wrangler dev)
 ```
 
@@ -87,7 +87,7 @@ Done and verified:
 - Frontend: converter, range strip, trust badge, source tables, all-currencies table, history chart. Checked in a headless browser at desktop and phone widths (no horizontal scroll). The earlier "did not mount" bug was real: `/api/currencies` entries carry no `code` field, so `fillSelects()` threw inside `init()` as a silent unhandled rejection. Fixed, and `init()` now reports startup errors on the page.
 - `ratesTable` (`/api/rates?base=…`) now computes spread, trust and official columns for the actual cross pair; previously a non-USD base showed each currency's USD figures, and mixed market and official rates when the base had no central bank.
 - Node server: a malformed URL (`/%E0%A4%A`) used to crash the process via an unhandled rejection; it now returns 400.
-- Tests: 66 offline tests across stats, cache, adapters, aggregation, API routes and the static server. `.github/workflows/ci.yml` runs them on Node 22 and 24 and checks that the Worker bundles.
+- Tests: 67 offline tests across stats, cache, adapters, aggregation, API routes and the static server. `.github/workflows/ci.yml` runs them on Node 22 and 24 and checks that the Worker bundles.
 - Worker: `wrangler deploy --dry-run` bundles cleanly (JSON import included) and `wrangler dev` serves pages and API correctly.
 
 Next, the core of the mission (see [`docs/research.md`](docs/research.md)):
