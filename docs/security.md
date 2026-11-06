@@ -91,6 +91,11 @@ Rotate it if it is ever pasted into a terminal transcript, an issue, or a chat.
 `src/server.js` (Node) and `src/worker.js` (Workers), so the two runtimes cannot
 drift apart.
 
+`wrangler.toml` sets `run_worker_first = true` under `[assets]`. Without it,
+Workers Assets answers static requests itself and never invokes the Worker — the
+headers then reach `/api/*` but not the HTML, which is exactly what happened on
+the first deploy and was caught by checking the live response.
+
 - `content-security-policy` — `default-src 'self'`; `script-src 'self'` with no
   inline and no eval, which is the directive that actually stops XSS. `style-src`
   also allows inline, because the range strip and the chart position elements with
