@@ -1,6 +1,6 @@
 # Product direction: from a rate site to a fair-price check
 
-Notes from 6 November 2026. **Status: explored and written down, not being built now.** Work moved the same day to SarfBench (see [`README.md`](README.md) in this folder). Every figure below was found by web search on that date. Most come from news sites and search summaries, not from the original documents, so check a figure at its source before publishing it.
+Notes from 6 November 2026. **Status: explored and written down, not being built now.** Every figure below was found by web search on that date. Most come from news sites and search summaries, not from the original documents, so check a figure at its source before publishing it.
 
 ## 1. The goal, sharpened
 

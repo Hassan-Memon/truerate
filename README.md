@@ -2,6 +2,8 @@
 
 **One honest exchange rate, with every source shown.**
 
+**Live:** [truerate.truerate-app.workers.dev](https://truerate.truerate-app.workers.dev) · [![CI](https://github.com/Hassan-Memon/truerate/actions/workflows/ci.yml/badge.svg)](https://github.com/Hassan-Memon/truerate/actions/workflows/ci.yml) [![Deploy](https://github.com/Hassan-Memon/truerate/actions/workflows/deploy.yml/badge.svg)](https://github.com/Hassan-Memon/truerate/actions/workflows/deploy.yml)
+
 ## The problem
 
 > **Money is property, and every property deserves an evaluation people can see.**
@@ -65,7 +67,7 @@ Responses are cached five minutes in memory and carry `Cache-Control` so the edg
 
 1. Create a free Cloudflare account (no card needed).
 2. `npx wrangler@4 login` then `npm run deploy`. You get `https://truerate.<you>.workers.dev`.
-3. Or deploy from CI: set the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets on the `production` environment, set the repository variable `DEPLOY_ENABLED=true`, and push to `master`. Deploy is off until you do — see [`docs/security.md`](docs/security.md#cicd) for the minimum token scope.
+3. Or deploy from CI: add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as Actions secrets, set the repository variable `DEPLOY_ENABLED=true`, and merge to `master`. Deploy stays off until you do — see [`docs/security.md`](docs/security.md#cicd) for the token scope.
 
 Any Node host (Render, Fly, Railway free tiers) also works: `PORT=8080 node src/server.js`.
 
@@ -80,15 +82,15 @@ public/                index.html, app.js, styles.css (no build step)
 scripts/build-currencies.mjs   regenerates src/core/currencies.json (166 fiat currencies)
 ```
 
-## Status (2026-11-04)
+## Status (2026-11-07)
+
+Live at [truerate.truerate-app.workers.dev](https://truerate.truerate-app.workers.dev) on the Cloudflare Workers free plan. Every merge to `master` runs the tests and deploys ([`deploy.yml`](.github/workflows/deploy.yml)).
 
 Done and verified:
-- Backend: all endpoints, verified live with 4 market feeds (USD/PKR) and earlier with 19 central banks + the SBP stale fallback.
-- Frontend: converter, range strip, trust badge, source tables, all-currencies table, history chart. Checked in a headless browser at desktop and phone widths (no horizontal scroll). The earlier "did not mount" bug was real: `/api/currencies` entries carry no `code` field, so `fillSelects()` threw inside `init()` as a silent unhandled rejection. Fixed, and `init()` now reports startup errors on the page.
-- `ratesTable` (`/api/rates?base=…`) now computes spread, trust and official columns for the actual cross pair; previously a non-USD base showed each currency's USD figures, and mixed market and official rates when the base had no central bank.
-- Node server: a malformed URL (`/%E0%A4%A`) used to crash the process via an unhandled rejection; it now returns 400.
-- Tests: 67 offline tests across stats, cache, adapters, aggregation, API routes and the static server. `.github/workflows/ci.yml` runs them on Node 22 and 24 and checks that the Worker bundles.
-- Worker: `wrangler deploy --dry-run` bundles cleanly (JSON import included) and `wrangler dev` serves pages and API correctly.
+- Backend: all endpoints, checked live with 4 market feeds and 108 central banks (USD/PKR), plus the SBP stale fallback.
+- Frontend: converter, range strip, trust badge, source tables, all-currencies table, history chart. Checked in a headless browser at desktop and phone widths, no console errors, no horizontal scroll.
+- Security headers on every response, HTML and API alike (`run_worker_first` in `wrangler.toml`); see [`docs/security.md`](docs/security.md).
+- Tests: 67 offline tests across stats, cache, adapters, aggregation, API routes and the static server. [`ci.yml`](.github/workflows/ci.yml) runs them on Node 22 and 24 and checks that the Worker bundles.
 
 Next, the core of the mission (see [`docs/research.md`](docs/research.md)):
 1. **Rate ladder** per pair: interbank → bank buy/sell → open market → what you pay, each with publisher, method in their own words, time and a link to the original document.
@@ -99,11 +101,13 @@ Next, the core of the mission (see [`docs/research.md`](docs/research.md)):
 6. Add other countries' official publishers one by one.
 
 Open:
-1. Deploy: `npx wrangler@4 login && npm run deploy` (needs your Cloudflare account). Watch CPU time on the free plan (10 ms per request): parsing the full Frankfurter `expand=providers` response is the heaviest step and only happens once per 5-minute snapshot per isolate.
-2. To auto-deploy from Actions: set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` on the `production` environment, then `gh variable set DEPLOY_ENABLED --body true`. See [`docs/security.md`](docs/security.md#cicd).
-3. The canonical URL in `public/index.html` points at `truerate.pages.dev`; change it to the real deployed URL.
-4. History relies on Frankfurter alone; when it is down the chart says so. A second history source would remove that single point of failure.
-5. Later: Urdu/RTL toggle, street-rate tier when a public feed exists, embed widget.
+1. CPU time on the free plan (10 ms per request): parsing the full Frankfurter `expand=providers` response is the heaviest step and only happens once per 5-minute snapshot per isolate. Watch it as traffic grows.
+2. History relies on Frankfurter alone; when it is down the chart says so. A second history source would remove that single point of failure.
+3. Later: Urdu/RTL toggle, street-rate tier when a public feed exists, embed widget.
+
+## Contributing
+
+`master` takes pull requests only, with green CI, and the rule applies to the maintainer too. Branch, open a PR, merge when the checks pass; the merge deploys.
 
 ## Security
 
