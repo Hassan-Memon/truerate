@@ -1,6 +1,6 @@
 # Idea: a fee-only exchange company with zero spread
 
-Notes from 6 November 2026. **Status: idea recorded, paused the same day.** This page is not legal or religious advice. The fiqh section is a summary of published sources, gathered by an AI assistant, for Hassan to judge as the qualified person. A written fatwa and a reading of the current State Bank rules are needed before any step.
+Notes from 6 November 2026. **Status: idea recorded, paused the same day.** This page is not legal or religious advice. The fiqh section is a summary of published sources, gathered by an AI assistant and not yet reviewed by a scholar. A written fatwa and a reading of the current State Bank rules are needed before any step.
 
 ## 1. The idea, in the founder's words
 
