@@ -77,7 +77,7 @@ test('GET /api/convert multiplies through and gives the low/high band', async ()
   assert.equal(body.low, 27900);
   assert.equal(body.high, 28200);
   assert.equal(body.official, 28300);
-  assert.equal(body.confidence.label, 'high');
+  assert.equal(body.agreement.label, 'strong');
 });
 
 test('GET /api/convert rejects a bad amount', async () => {
@@ -166,5 +166,5 @@ test('central-bank feed down: pair still answers from the market, and says so', 
   assert.equal(body.rate, 280.5);
   assert.equal(body.official, null);
   assert.equal(body.feeds.official, false);
-  assert.ok(body.confidence.reasons.includes('no central-bank quote to cross-check'));
+  assert.ok(body.agreement.reasons.includes('no central-bank quote to cross-check'));
 });

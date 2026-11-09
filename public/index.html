@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TrueRate — the consensus exchange rate, with every source shown</title>
-  <meta name="description" content="Why does every website show a different dollar rate? TrueRate pulls live quotes from independent market feeds and ~100 central banks, shows the consensus rate, the full spread between sources, and how much to trust it. Free, open source, no sign-up.">
+  <title>TrueRate — what did your currency deal really cost?</title>
+  <meta name="description" content="Enter what you gave and what you received. TrueRate shows what your currency deal cost against the market rate that day, with every source shown. Your amounts stay on your device. Free, open source, no sign-up.">
   <link rel="canonical" href="https://truerate.truerate-app.workers.dev/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="TrueRate — one honest exchange rate, every source shown">
-  <meta property="og:description" content="Consensus rate across market feeds and central banks, with the spread and a confidence score. USD, PKR, EUR, GBP, SAR, AED, INR and 160 more.">
+  <meta property="og:title" content="TrueRate — what did your currency deal really cost?">
+  <meta property="og:description" content="Check any currency deal against the market rate that day, in your own money. Your amounts stay on your device.">
   <meta name="twitter:card" content="summary">
   <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)">
@@ -16,7 +16,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/styles.css">
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"WebApplication","name":"TrueRate","applicationCategory":"FinanceApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0"},"description":"Consensus currency exchange rates aggregated from independent market feeds and central banks, with the spread between sources shown."}
+  {"@context":"https://schema.org","@type":"WebApplication","name":"TrueRate","applicationCategory":"FinanceApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0"},"description":"Checks what a currency deal cost against the market rate that day, with every source shown."}
   </script>
 </head>
 <body>
@@ -26,32 +26,89 @@
       <span>TrueRate</span>
     </a>
     <nav class="nav">
-      <a href="#sources">Sources</a>
-      <a href="#all">All currencies</a>
-      <a href="#api">API</a>
-      <a href="#method">Method</a>
-      <a href="https://github.com/Hassan-Memon/truerate" rel="noopener">GitHub</a>
+      <a href="#check" data-i18n="nav.check">Check a deal</a>
+      <a href="#ladder" data-i18n="nav.ladder">Rate ladder</a>
+      <a href="#rates" data-i18n="nav.rates">Rates</a>
+      <a href="#method" data-i18n="nav.method">Method</a>
+      <button type="button" class="lang" id="lang" lang="ur" data-i18n="lang.toggle">اردو</button>
     </nav>
   </header>
 
   <main>
-    <section class="hero">
-      <h1>One honest rate. Every source shown.</h1>
-      <p class="lede">Every site quotes a different number for the dollar. TrueRate asks <span id="src-count">several</span> independent market feeds and <span id="bank-count">~100</span> central banks at once, then shows you the consensus, the disagreement, and how much to trust it.</p>
+    <section class="hero" id="check">
+      <h1 data-i18n="hero.title">What did your currency deal really cost you?</h1>
+      <p class="lede" data-i18n="hero.lede">Enter what you gave and what you received. We compare it with the market rate that day and show the cost in your own money.</p>
 
+      <form class="deal card" id="deal" autocomplete="off" novalidate>
+        <div class="deal-row">
+          <div class="field">
+            <label for="deal-gave" data-i18n="deal.gave">I gave</label>
+            <input id="deal-gave" type="text" inputmode="decimal" dir="ltr" placeholder="1,000">
+          </div>
+          <div class="field">
+            <label for="deal-from" data-i18n="deal.currency">Currency</label>
+            <select dir="ltr" id="deal-from"></select>
+          </div>
+        </div>
+        <div class="deal-row">
+          <div class="field">
+            <label for="deal-received" data-i18n="deal.received">I received</label>
+            <input id="deal-received" type="text" inputmode="decimal" dir="ltr" placeholder="272,500">
+          </div>
+          <div class="field">
+            <label for="deal-to" data-i18n="deal.currency">Currency</label>
+            <select dir="ltr" id="deal-to"></select>
+          </div>
+        </div>
+        <div class="deal-row">
+          <div class="field">
+            <label for="deal-date" data-i18n="deal.date">Date of the deal</label>
+            <input id="deal-date" type="date" dir="ltr">
+          </div>
+          <div class="field">
+            <label for="deal-channel" data-i18n="deal.channel">How did you change it?</label>
+            <select id="deal-channel">
+              <option value="remittance" data-i18n="channel.remittance">Remittance app or service</option>
+              <option value="freelance" data-i18n="channel.freelance">Freelance payout (Payoneer etc.)</option>
+              <option value="bank" data-i18n="channel.bank">Bank</option>
+              <option value="exchange" data-i18n="channel.exchange">Exchange company</option>
+              <option value="card" data-i18n="channel.card">Card abroad</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="primary" id="deal-submit" data-i18n="deal.submit">Check my deal</button>
+        <p class="privacy small" data-i18n="deal.privacy">Your amounts stay on your device. The calculation runs in your browser and is never sent to us.</p>
+      </form>
+
+      <div id="deal-result" class="deal-result" aria-live="polite"></div>
+    </section>
+
+    <section id="ladder" class="section">
+      <h2 data-i18n="ladder.title">The rate ladder</h2>
+      <p class="muted" data-i18n="ladder.lede">There is no single dollar rate. Each step below is a different price, and "every site shows a different rate" is mostly sites showing different steps.</p>
+      <div class="card" id="ladder-card"></div>
+      <div class="card" id="who-card">
+        <h3 data-i18n="who.title">Who decides this rate?</h3>
+        <div id="who"></div>
+      </div>
+    </section>
+
+    <section id="rates" class="section">
+      <h2 data-i18n="rates.title">Market rates</h2>
+      <p class="muted" data-i18n="rates.lede">A converter for reference. These are mid-market figures, not prices you can trade at, and your bank or money changer will differ.</p>
       <form class="converter card" id="converter" autocomplete="off">
         <div class="field amount">
-          <label for="amount">Amount</label>
-          <input id="amount" name="amount" type="text" inputmode="decimal" value="1" aria-describedby="result">
+          <label for="amount" data-i18n="conv.amount">Amount</label>
+          <input id="amount" name="amount" type="text" inputmode="decimal" dir="ltr" value="1" aria-describedby="result">
         </div>
         <div class="field">
-          <label for="from">From</label>
-          <select id="from" name="from"></select>
+          <label for="from" data-i18n="conv.from">From</label>
+          <select dir="ltr" id="from" name="from"></select>
         </div>
         <button type="button" class="swap" id="swap" aria-label="Swap currencies" title="Swap">⇄</button>
         <div class="field">
-          <label for="to">To</label>
-          <select id="to" name="to"></select>
+          <label for="to" data-i18n="conv.to">To</label>
+          <select dir="ltr" id="to" name="to"></select>
         </div>
       </form>
 
@@ -59,16 +116,16 @@
         <div class="result" id="result">
           <div class="big skeleton">&nbsp;</div>
         </div>
-        <div class="unit" id="unit"></div>
+        <div class="unit" id="unit" dir="ltr"></div>
         <div class="band" id="band"></div>
         <div class="official-line" id="official-line"></div>
-        <div class="confidence" id="confidence"></div>
+        <div class="confidence" id="agreement"></div>
       </div>
 
       <div class="card chart-card">
         <div class="chart-head">
-          <h2 id="chart-title">History</h2>
-          <div class="ranges" role="group" aria-label="History range">
+          <h3 id="chart-title" data-i18n="chart.history">History</h3>
+          <div class="ranges" role="group" aria-label="History range" dir="ltr">
             <button type="button" data-days="7">7d</button>
             <button type="button" data-days="30" class="on">30d</button>
             <button type="button" data-days="90">90d</button>
@@ -76,80 +133,86 @@
             <button type="button" data-days="1825">5y</button>
           </div>
         </div>
-        <div class="chart" id="chart"></div>
-        <p class="chart-note">Daily official reference rates (central-bank consensus via Frankfurter). Hover or touch for the value on a day.</p>
+        <div class="chart" id="chart" dir="ltr"></div>
+        <p class="chart-note" data-i18n="chart.note">Daily central-bank figures via Frankfurter. Hover or touch for the value on a day.</p>
       </div>
     </section>
 
     <section id="sources" class="section">
-      <h2>Where this number comes from</h2>
-      <p class="muted" id="sources-intro"></p>
-      <div class="two-col">
-        <div class="card">
-          <h3>Market feeds <span class="pill" id="market-n"></span></h3>
-          <p class="muted small">Live mid-market aggregators. The consensus rate above is the median of these.</p>
-          <table class="tbl" id="market-table"><thead><tr><th>Source</th><th class="num">Rate</th><th class="num">vs consensus</th><th>As of</th></tr></thead><tbody></tbody></table>
+      <details class="fold">
+        <summary><h2 data-i18n="src.title">Where the numbers come from</h2></summary>
+        <p class="muted" id="sources-intro"></p>
+        <div class="two-col">
+          <div class="card">
+            <h3><span data-i18n="src.market">Market feeds</span> <span class="pill" id="market-n"></span></h3>
+            <p class="muted small" data-i18n="src.market.note">Free aggregators of mid-market rates. They do not fully publish their methods, and may share upstream data.</p>
+            <table class="tbl" id="market-table"><thead><tr><th data-i18n="src.th.source">Source</th><th class="num" data-i18n="src.th.rate">Rate</th><th class="num" data-i18n="src.th.vs">vs median</th><th data-i18n="src.th.asof">As of</th></tr></thead><tbody></tbody></table>
+          </div>
+          <div class="card">
+            <h3><span data-i18n="src.banks">Central-bank figures</span> <span class="pill" id="bank-n"></span></h3>
+            <p class="muted small" data-i18n="src.banks.note">Reference rates published by central banks. Most are not the bank that issues this currency, and some are days old.</p>
+            <table class="tbl" id="bank-table"><thead><tr><th data-i18n="src.th.inst">Institution</th><th class="num" data-i18n="src.th.rate">Rate</th><th class="num" data-i18n="src.th.vsOfficial">vs blend</th><th data-i18n="src.th.date">Date</th></tr></thead><tbody></tbody></table>
+            <button type="button" class="link" id="bank-more" hidden></button>
+          </div>
         </div>
-        <div class="card">
-          <h3>Central banks <span class="pill" id="bank-n"></span></h3>
-          <p class="muted small">Official reference rates published by monetary authorities. Slower, but authoritative.</p>
-          <table class="tbl" id="bank-table"><thead><tr><th>Institution</th><th class="num">Rate</th><th class="num">vs official</th><th>Date</th></tr></thead><tbody></tbody></table>
-          <button type="button" class="link" id="bank-more" hidden></button>
-        </div>
-      </div>
+      </details>
     </section>
 
     <section id="all" class="section">
-      <div class="section-head">
-        <h2>All currencies against <span id="all-base">USD</span></h2>
+      <details class="fold">
+        <summary><h2 id="all-title">All currencies against USD</h2></summary>
         <input id="search" type="search" placeholder="Search currency or code" aria-label="Search currencies">
-      </div>
-      <div class="card">
-        <table class="tbl all" id="all-table">
-          <thead><tr><th>Currency</th><th class="num">1 <span class="all-base">USD</span> =</th><th class="num">Spread</th><th class="num">Official</th><th>Trust</th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <div class="card">
+          <table class="tbl all" id="all-table">
+            <thead><tr><th data-i18n="all.th.currency">Currency</th><th class="num">1 <span class="all-base" dir="ltr">USD</span> =</th><th class="num" data-i18n="all.th.spread">Spread</th><th class="num" data-i18n="all.th.official">Central banks</th><th data-i18n="all.th.agree">Agreement</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section id="method" class="section">
+      <h2 data-i18n="method.title">How TrueRate works</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3 data-i18n="method.why.h">Why rates differ</h3>
+          <p data-i18n="method.why.1">There is no single true exchange rate. Banks trade with each other at the interbank rate. Banks and money changers quote their customers a buying and a selling rate around it. Websites copy one of these, at different times.</p>
+          <p data-i18n="method.why.2">So we measure your deal against a benchmark, show how good that benchmark is, and say so when it is not good enough.</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="method.rules.h">The rules</h3>
+          <ol class="rules">
+            <li data-i18n="method.rule.1">Cost is what you would have received at the benchmark, minus what you did receive.</li>
+            <li data-i18n="method.rule.2">For today we use the median of the live market feeds. For past dates we use central-bank figures for that date.</li>
+            <li data-i18n="method.rule.3">Under 1% is close to market, 1–3% is noticeable, and 3% or more is high. These bands are our judgement; 3% is the UN target for the cost of sending money home.</li>
+            <li data-i18n="method.rule.4">Differences inside the margin of error get no verdict.</li>
+            <li data-i18n="method.rule.5">If sources split into separate groups, or a currency is documented as having more than one rate, we give no rate and no verdict.</li>
+            <li data-i18n="method.rule.6">Figures more than three days old are marked. Unknowns say "not yet documented".</li>
+          </ol>
+          <p class="small muted" data-i18n="method.notes">We show licensed channels only and never rank a provider for money. Nothing here is financial or religious advice.</p>
+        </div>
       </div>
     </section>
 
     <section id="api" class="section">
-      <h2>Free JSON API</h2>
-      <p class="muted">The same data this page uses, no key required. Please cache on your side; responses are good for five minutes.</p>
-      <div class="card">
-        <pre><code id="api-example">GET /api/pair?from=USD&amp;to=PKR
+      <details class="fold">
+        <summary><h2 data-i18n="api.title">Free JSON API</h2></summary>
+        <p class="muted" data-i18n="api.lede">The same data this page uses, no key required. Please cache on your side; responses are good for five minutes.</p>
+        <div class="card">
+          <pre dir="ltr"><code id="api-example">GET /api/benchmark?from=USD&amp;to=PKR&amp;date=2026-11-04
+GET /api/pair?from=USD&amp;to=PKR
 GET /api/convert?from=USD&amp;to=PKR&amp;amount=100
 GET /api/rates?base=PKR
 GET /api/history?from=USD&amp;to=PKR&amp;days=90</code></pre>
-      </div>
-    </section>
-
-    <section id="method" class="section">
-      <h2>How TrueRate decides</h2>
-      <div class="two-col">
-        <div class="card">
-          <h3>Why rates differ everywhere</h3>
-          <p>There is no single "true" exchange rate. Banks trade with each other at the <strong>interbank</strong> rate. A money changer quotes a <strong>buying</strong> and a <strong>selling</strong> rate on either side of it. Central banks publish an <strong>official reference</strong> once a day. Websites copy one of these, at different times, and round differently.</p>
-          <p>So instead of pretending to know the exact number, TrueRate shows the <strong>consensus</strong> and the <strong>spread</strong>. If sources agree within 0.2%, the number is solid. If they disagree by 3%, you deserve to know that before you move money.</p>
         </div>
-        <div class="card">
-          <h3>The rules</h3>
-          <ol class="rules">
-            <li><strong>Consensus</strong> = median of the live market feeds. A median ignores one bad feed.</li>
-            <li><strong>Range</strong> = lowest to highest feed, shown as a percentage spread.</li>
-            <li><strong>Official</strong> = Frankfurter's consensus of central-bank quotes, plus the issuing bank's own figure when it exists, even if it is days old (marked stale).</li>
-            <li><strong>Trust score</strong> starts at 100 and loses points for few sources, wide spread, a gap between market and official, and stale data.</li>
-            <li>Cross rates (say PKR→SAR) are built per source, so each source's own internal consistency is kept.</li>
-          </ol>
-          <p class="small muted">Street (kerb) rates from money changers are not in any free public feed yet. When one appears, it will be added as its own tier.</p>
-        </div>
-      </div>
+      </details>
     </section>
   </main>
 
   <footer class="foot">
     <p id="updated" class="muted small"></p>
-    <p class="small muted">Data: <a href="https://www.exchangerate-api.com/docs/free" rel="noopener">ExchangeRate-API</a>, <a href="https://github.com/fawazahmed0/exchange-api" rel="noopener">Currency-API</a>, <a href="https://www.floatrates.com/" rel="noopener">FloatRates</a>, <a href="https://moneyconvert.net/" rel="noopener">MoneyConvert</a>, and ~100 central banks via <a href="https://frankfurter.dev/" rel="noopener">Frankfurter</a>. Not financial advice. Rates are informational; the rate you get from a bank or money changer will differ.</p>
-    <p class="small muted">TrueRate is open source under the MIT licence. <a href="https://github.com/Hassan-Memon/truerate" rel="noopener">Contribute a source</a>.</p>
+    <p class="small muted" data-i18n="foot.data">Data: ExchangeRate-API, Currency-API, FloatRates, MoneyConvert, central banks via Frankfurter, and published documents of the State Bank of Pakistan. Rates are informational, not financial advice.</p>
+    <p class="small muted"><span data-i18n="foot.source">Open source under the MIT licence.</span> <a href="https://github.com/Hassan-Memon/truerate" rel="noopener" data-i18n="foot.contribute">Correct us or add a source</a></p>
   </footer>
 
   <script src="/app.js" type="module"></script>

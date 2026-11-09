@@ -1,0 +1,10 @@
+{
+  "USD/PKR": {
+    "date": "2026-11-04",
+    "rows": [
+      { "id": "interbank", "publisher": "State Bank of Pakistan", "document": "Mark-to-Market revaluation rate", "method": "weighted average of closing interbank exchange rate collected through Brokerage Houses", "mid": 276.704, "url": "https://www.sbp.org.pk/assets/document/mark-to-market-revaluation-exchange-rate-04-november-2026.pdf" },
+      { "id": "bank", "publisher": "State Bank of Pakistan", "document": "Weighted Average Customer Exchange Rates", "method": "an estimate of the Exchange Rates quoted by various Commercial Banks to their clients", "buy": 276.3921, "sell": 276.849, "url": "https://www.sbp.org.pk/assets/document/weighted-average-customer-exchange-rates-04-November-2026.pdf" },
+      { "id": "open", "publisher": "Exchange Companies Association of Pakistan, on SBP's site", "document": "Open Market Closing Exchange Rates", "method": "published for information only", "buy": 277.35, "sell": 278.48, "url": "https://www.sbp.org.pk/assets/document/open-market-closing-exchange-rates-4-November-2026.pdf" }
+    ]
+  }
+}

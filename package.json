@@ -1,7 +1,7 @@
 {
   "name": "truerate",
   "version": "0.1.0",
-  "description": "Consensus exchange rates built from many independent sources, with the spread shown instead of hidden.",
+  "description": "Check what a currency deal really cost you, against the market rate that day, with every source shown.",
   "type": "module",
   "private": true,
   "engines": {

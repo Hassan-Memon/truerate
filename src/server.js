@@ -8,6 +8,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApi } from './api.js';
 import { SECURITY_HEADERS } from './core/headers.js';
+import { pairFromUrl, renderPairHtml } from './core/pages.js';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -38,10 +39,9 @@ async function serveStatic(pathname, res) {
     });
     res.end(body);
   } catch {
-    const html = await readFile(join(PUBLIC, 'index.html')).catch(() => null);
-    if (html && !extname(rel)) { res.writeHead(200, { ...SECURITY_HEADERS, 'content-type': TYPES['.html'] }); return res.end(html); }
-    res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
-    res.end('not found');
+    const page = await readFile(join(PUBLIC, '404.html')).catch(() => 'not found');
+    res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': TYPES['.html'] });
+    res.end(page);
   }
 }
 
@@ -54,6 +54,12 @@ async function handle(req, res) {
     const body = Buffer.from(await out.arrayBuffer());
     res.writeHead(out.status, { ...SECURITY_HEADERS, ...headers, 'content-length': body.length });
     return res.end(req.method === 'HEAD' ? undefined : body);
+  }
+  const pair = pairFromUrl(url);
+  if (pair) {
+    const html = await readFile(join(PUBLIC, 'index.html'), 'utf8');
+    res.writeHead(200, { ...SECURITY_HEADERS, 'content-type': TYPES['.html'], 'cache-control': 'public, max-age=60' });
+    return res.end(renderPairHtml(html, pair));
   }
   return serveStatic(url.pathname, res);
 }

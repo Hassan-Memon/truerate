@@ -17,21 +17,23 @@ export function marketPayloads(now = Date.now()) {
       result: 'success',
       time_last_update_unix: Math.floor((now - 3600e3) / 1000),
       base_code: 'USD',
-      rates: { USD: 1, PKR: 280, SAR: 3.75, EUR: 0.92, JPY: 150, XYZ: 5 },
+      rates: { USD: 1, PKR: 280, SAR: 3.75, EUR: 0.92, JPY: 150, XYZ: 5, SYP: 122, MMK: 2100, CAD: 1.40 },
     },
     fawaz: {
       date: ymd,
-      usd: { usd: 1, pkr: 281, sar: 3.76, eur: 0.921, jpy: 151, btc: 0.00001, bad: 'x' },
+      usd: { usd: 1, pkr: 281, sar: 3.76, eur: 0.921, jpy: 151, btc: 0.00001, bad: 'x', syp: 13000, mmk: 2100, cad: 1.41 },
     },
     floatrates: {
       pkr: { code: 'PKR', rate: 279, date: new Date(now - 3600e3).toUTCString() },
       sar: { code: 'SAR', rate: '3.74', date: new Date(now - 3600e3).toUTCString() },
       eur: { code: 'EUR', rate: 0.919, date: new Date(now - 3600e3).toUTCString() },
+      syp: { code: 'SYP', rate: 122, date: new Date(now - 3600e3).toUTCString() },
+      cad: { code: 'CAD', rate: 1.40, date: new Date(now - 3600e3).toUTCString() },
       zzz: { code: 'zz', rate: 1, date: 'garbage' },
     },
     moneyconvert: {
       base: 'USD',
-      rates: { USD: 1, PKR: 282, SAR: '3.75', EUR: 0.92, NEG: -1 },
+      rates: { USD: 1, PKR: 282, SAR: '3.75', EUR: 0.92, NEG: -1, SYP: 13000, CAD: 2.8 },
       lastModified: new Date(now - 600e3).toUTCString(),
     },
   };

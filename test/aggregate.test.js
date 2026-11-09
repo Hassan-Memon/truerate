@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSnapshot, pairDetail, ratesTable, confidenceFor } from '../src/core/aggregate.js';
+import { buildSnapshot, pairDetail, ratesTable, agreementFor } from '../src/core/aggregate.js';
 import { loadMarketSources } from '../src/core/sources.js';
 import { loadOfficial } from '../src/core/official.js';
 import { median, spreadPct, round, sig } from '../src/core/stats.js';
@@ -16,34 +16,34 @@ async function snapshot({ fail = [], now = NOW } = {}) {
 
 const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps * Math.max(1, Math.abs(b)), `${a} ≉ ${b}`);
 
-/* ---------- confidence ---------- */
+/* ---------- agreement ---------- */
 
-test('confidenceFor: four agreeing sources with an official match is high trust', () => {
-  const c = confidenceFor({ n: 4, spread: 0.1, gapPct: 0.05, staleCount: 0, hasOfficial: true });
-  assert.equal(c.label, 'high');
+test('agreementFor: four agreeing sources with an official match is strong agreement', () => {
+  const c = agreementFor({ n: 4, spread: 0.1, gapPct: 0.05, staleCount: 0, hasOfficial: true });
+  assert.equal(c.label, 'strong');
   assert.equal(c.score, 98);
   assert.deepEqual(c.reasons, []);
 });
 
-test('confidenceFor: penalties and reasons accumulate', () => {
-  const c = confidenceFor({ n: 1, spread: 0, gapPct: -3, staleCount: 1, hasOfficial: true });
-  assert.equal(c.score, 100 - 30 - 12 - 5); // 53: just under the 55 'medium' cutoff
-  assert.equal(c.label, 'low');
-  assert.equal(confidenceFor({ n: 1, spread: 0, gapPct: -3, staleCount: 0, hasOfficial: true }).label, 'medium');
+test('agreementFor: penalties and reasons accumulate', () => {
+  const c = agreementFor({ n: 1, spread: 0, gapPct: -3, staleCount: 1, hasOfficial: true });
+  assert.equal(c.score, 100 - 30 - 12 - 5); // 53: just under the 55 'partial' cutoff
+  assert.equal(c.label, 'weak');
+  assert.equal(agreementFor({ n: 1, spread: 0, gapPct: -3, staleCount: 0, hasOfficial: true }).label, 'partial');
   assert.deepEqual(c.reasons, ['only one market source', 'official rate is 3% below market', '1 source older than 48h']);
 });
 
-test('confidenceFor: official-only data, wide spread, clamps at zero', () => {
-  const c = confidenceFor({ n: 0, spread: 10, gapPct: null, staleCount: 3, hasOfficial: true });
+test('agreementFor: official-only data, wide spread, clamps at zero', () => {
+  const c = agreementFor({ n: 0, spread: 10, gapPct: null, staleCount: 3, hasOfficial: true });
   assert.equal(c.score, 0);
-  assert.equal(c.label, 'low');
+  assert.equal(c.label, 'weak');
   assert.ok(c.reasons.includes('no live market source; official rate only'));
   assert.ok(c.reasons.includes('sources disagree by 10%'));
   assert.ok(c.reasons.includes('3 sources older than 48h'));
 });
 
-test('confidenceFor: missing central bank costs 5 points', () => {
-  const c = confidenceFor({ n: 4, spread: 0, gapPct: null, staleCount: 0, hasOfficial: false });
+test('agreementFor: missing central bank costs 5 points', () => {
+  const c = agreementFor({ n: 4, spread: 0, gapPct: null, staleCount: 0, hasOfficial: false });
   assert.equal(c.score, 95);
   assert.deepEqual(c.reasons, ['no central-bank quote to cross-check']);
 });
@@ -64,10 +64,10 @@ test('snapshot: consensus is the median of market feeds, with spread and officia
   // per-source deviation from consensus
   const mc = pkr.market.quotes.find((q) => q.source === 'moneyconvert');
   assert.equal(mc.devPct, round(((282 - 280.5) / 280.5) * 100, 4));
-  // confidence: 4 sources (0), spread 1.0695% (-16.04), gap 0.89% (-3.57) -> 80
-  assert.equal(pkr.confidence.score, 80);
-  assert.equal(pkr.confidence.label, 'high');
-  assert.deepEqual(pkr.confidence.reasons, ['sources disagree by 1.07%']);
+  // agreement: 4 sources (0), spread 1.0695% (-16.04), gap 0.89% (-3.57) -> 80
+  assert.equal(pkr.agreement.score, 80);
+  assert.equal(pkr.agreement.label, 'strong');
+  assert.deepEqual(pkr.agreement.reasons, ['sources disagree by 1.07%']);
 });
 
 test('snapshot: metadata, feed status and sources', async () => {
@@ -89,7 +89,7 @@ test('snapshot: only known fiat currencies are tracked', async () => {
   assert.equal(s.currencies.BTC, undefined);
   assert.equal(s.currencies.NEG, undefined);
   // currencies no feed carries are omitted rather than shown with a null rate
-  for (const c of Object.values(s.currencies)) assert.ok(c.rate > 0, c.code);
+  for (const c of Object.values(s.currencies)) assert.ok(c.rate > 0 || c.noConsensus, c.code);
 });
 
 test('snapshot: USD is 1 everywhere', async () => {
@@ -123,14 +123,14 @@ test('snapshot: issuing bank is found, and flagged stale when missing from the l
   assert.equal(pkr.date, new Date(NOW - 30 * 86400e3).toISOString().slice(0, 10));
 });
 
-test('snapshot: two sources and no central bank lowers trust', async () => {
+test('snapshot: two sources and no central bank lowers agreement', async () => {
   const jpy = (await snapshot()).currencies.JPY;
   assert.equal(jpy.market.n, 2);
   assert.equal(jpy.rate, 150.5);
   assert.equal(jpy.official, null);
   assert.equal(jpy.gapPct, null);
-  assert.ok(jpy.confidence.reasons.includes('only two market sources'));
-  assert.ok(jpy.confidence.reasons.includes('no central-bank quote to cross-check'));
+  assert.ok(jpy.agreement.reasons.includes('only two market sources'));
+  assert.ok(jpy.agreement.reasons.includes('no central-bank quote to cross-check'));
 });
 
 test('snapshot: stale market sources are counted', async () => {
@@ -138,7 +138,7 @@ test('snapshot: stale market sources are counted', async () => {
   const fetchImpl = makeFetch({ now: NOW - 3 * 86400e3 });
   const [market, official] = await Promise.all([loadMarketSources({ fetchImpl }), loadOfficial({ fetchImpl })]);
   const s = buildSnapshot({ market, official, now: NOW });
-  assert.ok(s.currencies.PKR.confidence.reasons.includes('4 sources older than 48h'));
+  assert.ok(s.currencies.PKR.agreement.reasons.includes('4 sources older than 48h'));
 });
 
 test('snapshot: falls back to official rate when no market feed is up', async () => {
@@ -146,7 +146,7 @@ test('snapshot: falls back to official rate when no market feed is up', async ()
   assert.equal(s.feeds.market, 0);
   assert.equal(s.currencies.PKR.rate, 283);
   assert.equal(s.currencies.PKR.market, null);
-  assert.ok(s.currencies.PKR.confidence.reasons.includes('no live market source; official rate only'));
+  assert.ok(s.currencies.PKR.agreement.reasons.includes('no live market source; official rate only'));
   assert.equal(s.currencies.JPY, undefined, 'no market and no official means no rate');
 });
 
@@ -221,7 +221,7 @@ test('ratesTable: USD base matches the snapshot', async () => {
   assert.equal(t.rates.PKR.spreadPct, s.currencies.PKR.market.spreadPct);
   assert.equal(t.rates.PKR.official, 283);
   assert.equal(t.rates.PKR.sources, 4);
-  assert.equal(t.rates.PKR.score, s.currencies.PKR.confidence.score);
+  assert.equal(t.rates.PKR.score, s.currencies.PKR.agreement.score);
   assert.equal(t.rates.USD.rate, 1);
 });
 
@@ -233,7 +233,7 @@ test('ratesTable: a non-USD base uses true cross figures, not the USD view', asy
   assert.equal(t.rates.SAR.spreadPct, d.market.spreadPct);
   assert.notEqual(t.rates.SAR.spreadPct, s.currencies.SAR.market.spreadPct);
   assert.equal(t.rates.SAR.official, d.official.rate);
-  assert.equal(t.rates.SAR.score, d.confidence.score);
+  assert.equal(t.rates.SAR.score, d.agreement.score);
   assert.equal(t.rates.PKR.rate, 1);
 });
 
