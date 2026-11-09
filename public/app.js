@@ -5,10 +5,11 @@ import { translator } from '/i18n.js';
 const $ = (s) => document.querySelector(s);
 const REFRESH_MS = 5 * 60 * 1000;
 
-const state = { from: 'USD', to: 'PKR', amount: 1, days: 30, currencies: {}, pair: null, table: null, history: null, lang: 'en', deal: null };
+const state = { from: 'USD', to: 'PKR', amount: 1, days: 30, currencies: {}, pair: null, table: null, history: null, lang: 'en', deal: null, onPairPage: false };
+const POPULAR = ['USD', 'PKR', 'SAR', 'AED', 'GBP', 'EUR', 'CAD', 'AUD', 'QAR', 'OMR', 'KWD', 'BHD'];
 let T = translator('en');
 
-const SOURCE_NAMES = { erapi: 'ExchangeRate-API', fawaz: 'Currency-API', floatrates: 'FloatRates', moneyconvert: 'MoneyConvert', frankfurter: 'Frankfurter' };
+const SOURCE_NAMES = { fawaz: 'Currency-API', floatrates: 'FloatRates', frankfurter: 'Frankfurter' };
 
 /* ---------- formatting ---------- */
 const nf = (opts) => new Intl.NumberFormat('en-US', opts);
@@ -60,18 +61,34 @@ const store = {
 function readUrl() {
   const q = new URLSearchParams(location.search);
   const code = (v) => (v && /^[a-z]{3}$/i.test(v) ? v.toUpperCase() : null);
-  const path = location.pathname.match(/^\/([a-z]{3})-to-([a-z]{3})\/?$/i);
-  state.from = code(path?.[1]) ?? code(q.get('from')) ?? code(store.get('tr.from')) ?? 'USD';
-  state.to = code(path?.[2]) ?? code(q.get('to')) ?? code(store.get('tr.to')) ?? 'PKR';
+  const path = location.pathname.match(/^(\/ur)?(?:\/([a-z]{3})-to-([a-z]{3}))?\/?$/i);
+  state.from = code(path?.[2]) ?? code(q.get('from')) ?? code(store.get('tr.from')) ?? 'USD';
+  state.to = code(path?.[3]) ?? code(q.get('to')) ?? code(store.get('tr.to')) ?? 'PKR';
+  state.onPairPage = !!(path?.[2] || (q.get('from') && q.get('to')));
+  state.pathLang = path?.[1] ? 'ur' : path?.[2] ? 'en' : null;
   const a = parseFloat(q.get('amount'));
   state.amount = Number.isFinite(a) && a >= 0 ? a : 1;
 }
-const pairPath = () => `/${state.from.toLowerCase()}-to-${state.to.toLowerCase()}`;
+const pairPath = () => `${state.lang === 'ur' ? '/ur' : ''}/${state.from.toLowerCase()}-to-${state.to.toLowerCase()}`;
+const homePath = () => (state.lang === 'ur' ? '/ur' : '/');
 function writeUrl() {
   const q = state.amount !== 1 ? `?amount=${state.amount}` : '';
-  if (state.from !== state.to) history.replaceState(null, '', pairPath() + q + location.hash);
+  if (state.from !== state.to) history.replaceState(null, '', (state.onPairPage ? pairPath() : homePath()) + q + location.hash);
   store.set('tr.from', state.from); store.set('tr.to', state.to);
-  document.title = `${state.from} to ${state.to}${state.pair?.rate ? ` · ${fmtRate(state.pair.rate)}` : ''} · TrueRate`;
+  renderHeading();
+}
+
+/* ---------- heading, summary and title follow the pair and the language ---------- */
+function publishableRate() {
+  const p = state.pair;
+  if (!p?.rate || p.regime.from?.noBenchmark || p.regime.to?.noBenchmark) return null;
+  return fmtRate(p.rate);
+}
+function renderHeading() {
+  const vars = { from: state.from, to: state.to, rate: publishableRate() };
+  $('h1').textContent = T(state.onPairPage ? 'hero.title.pair' : 'hero.title', vars);
+  document.title = T(!state.onPairPage ? 'seo.title.home' : vars.rate ? 'seo.title.pair' : 'seo.title.pairNoRate', vars);
+  $('#pair-summary').textContent = !state.onPairPage || !state.pair ? '' : T(vars.rate ? 'summary.rate' : 'summary.none', vars);
 }
 
 /* ---------- language ---------- */
@@ -83,19 +100,22 @@ function applyLanguage() {
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = T(el.dataset.i18n); });
   $('#lang').lang = state.lang === 'ur' ? 'en' : 'ur';
   $('#search').placeholder = T('all.search');
+  renderHeading();
 }
 function renderEverything() {
   applyLanguage();
+  if (Object.keys(state.currencies).length) fillSelects();
+  applyMode();
   if (state.pair) { renderResult(); renderLadder(); renderWho(); renderSources(); renderFooter(); }
   renderAll(); renderChart(); renderDeal();
 }
 
 /* ---------- render: selects ---------- */
 function fillSelects() {
-  const opts = Object.values(state.currencies)
-    .sort((a, b) => a.code.localeCompare(b.code))
-    .map((c) => `<option value="${c.code}">${c.flag ? c.flag + ' ' : ''}${c.code} · ${esc(c.name)}</option>`)
-    .join('');
+  const option = (c, name) => `<option value="${c.code}">${c.flag ? c.flag + ' ' : ''}${c.code} · ${esc(name)}</option>`;
+  const top = POPULAR.filter((c) => state.currencies[c]).map((c) => option(state.currencies[c], T(`cur.${c}`))).join('');
+  const rest = Object.values(state.currencies).sort((a, b) => a.code.localeCompare(b.code)).map((c) => option(c, c.name)).join('');
+  const opts = `<optgroup label="${esc(T('select.popular'))}">${top}</optgroup><optgroup label="${esc(T('select.all'))}">${rest}</optgroup>`;
   for (const id of ['#from', '#to', '#deal-from', '#deal-to']) $(id).innerHTML = opts;
   syncSelects();
 }
@@ -105,6 +125,12 @@ function syncSelects() {
 }
 
 /* ---------- render: deal check ---------- */
+const nextSteps = () => `<div class="next"><b>${esc(T('next.title'))}</b><ul><li>${esc(T('next.1'))}</li><li>${esc(T('next.2'))}</li><li>${esc(T('next.3'))}</li></ul></div>`;
+function contextLine(channel, from, to) {
+  const ctx = channelContext(channel, from, to, state.pair?.ladder);
+  const vars = { date: ltr(fmtDate(ctx.date)), rate: ltr(fmtRate(ctx.rate)), who: T(`ctx.who.${ctx.channel}`), totalPct: ltr(`${ctx.totalPct}%`), marginPct: ltr(`${ctx.marginPct}%`), collected: ltr(ctx.collected) };
+  return `<p class="small">${T(ctx.key, vars)}${ctx.url ? ` <a href="${esc(ctx.url)}" rel="noopener">${esc(T('ctx.link'))}</a>` : ''}</p>`;
+}
 function renderDeal() {
   const host = $('#deal-result');
   const d = state.deal;
@@ -112,12 +138,16 @@ function renderDeal() {
   if (d.error) { host.innerHTML = `<div class="alert">${esc(T(d.error))}</div>`; return; }
   if (d.loading) { host.innerHTML = `<div class="card muted">${esc(T('deal.checking'))}</div>`; return; }
 
-  const { bench, verdict, gave, received, from, to, channel } = d;
+  const { bench, verdict, gave, fee, received, from, to, channel, mode } = d;
   const url = `${location.origin}${pairPath()}`;
   const shareBar = (text) => `<div class="share">
       <a class="primary-link" href="https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}" target="_blank" rel="noopener">${esc(T('share.whatsapp'))}</a>
       <button type="button" class="link" id="copy-link">${esc(T('share.copy'))}</button>
     </div>`;
+  const bindCopy = () => $('#copy-link')?.addEventListener('click', async (e) => {
+    try { await navigator.clipboard.writeText(url); e.target.textContent = T('share.copied'); } catch { e.target.textContent = url; }
+  });
+  const plain = T('share.textPlain', { from, to });
 
   if (verdict.status === 'no-benchmark') {
     const regime = state.pair?.regime;
@@ -130,63 +160,88 @@ function renderDeal() {
     return;
   }
 
-  const pct = Math.abs(verdict.costPct);
-  const pctText = `${pct.toFixed(pct < 10 ? 1 : 0)}%`;
-  const cost = ltr(fmtMoney(aboutRound(verdict.displayCost), verdict.displayCurrency));
-  const costPlain = fmtMoney(aboutRound(verdict.displayCost), verdict.displayCurrency);
-  const pctHtml = ltr(pctText);
-  const headline = {
-    implausible: () => T('result.implausible', { pct: pctHtml }),
-    'about-market': () => T('result.about'),
-    better: () => T('result.better', { cost, pct: pctHtml }),
-  }[verdict.status]?.() ?? T('result.cost', { cost, pct: pctHtml });
+  const gradeLine = bench.source === 'central-bank-history'
+    ? T('grade.history', { date: ltr(fmtDate(bench.rateDate)), margin: ltr(`${bench.marginPct.toFixed(2)}%`) })
+    : T(`grade.${bench.grade}`, { margin: ltr(`${bench.marginPct.toFixed(2)}%`) });
+  const srcName = T(`source.${bench.source}`, { date: ltr(fmtDate(bench.rateDate)) });
+  const money = (x, code) => ltr(`${fmtAmount(x, code)} ${code}`);
 
-  if (verdict.status === 'implausible') {
-    host.innerHTML = `<div class="card verdict none"><p class="headline">${headline}</p></div>`;
+  if (verdict.status === 'estimate') {
+    host.innerHTML = `<div class="card verdict estimate">
+      <div class="chip">${esc(T('verdict.estimate'))}</div>
+      <p class="headline">${T('result.estimate', { amount: ltr(fmtMoney(aboutRound(verdict.expected, 3), to)) })}</p>
+      <dl class="sums">
+        <div><dt>${esc(T('est.market'))}</dt><dd>${money(verdict.expected, to)}</dd></div>
+        <div><dt>${esc(T('est.1'))}</dt><dd>${money(verdict.at1, to)}</dd></div>
+        <div><dt>${esc(T('est.3'))}</dt><dd>${money(verdict.at3, to)}</dd></div>
+      </dl>
+      <p class="small">${gradeLine}</p>
+      ${channel === 'exchange' ? `<p class="small">${esc(T('result.cash.note'))}</p>` : ''}
+      ${contextLine(channel, from, to)}
+      ${nextSteps()}
+      ${shareBar(plain)}
+    </div>`;
+    bindCopy();
     return;
   }
 
-  const grade = T(`grade.${bench.grade}`, { margin: ltr(`${bench.marginPct.toFixed(2)}%`) });
-  const srcName = T(`source.${bench.source}`, { date: ltr(fmtDate(bench.rateDate)) });
-  const ctx = channelContext(channel, from, to, state.pair?.ladder);
-  const ctxVars = { ...ctx, date: ltr(fmtDate(ctx.date)), rate: ltr(fmtRate(ctx.rate)), who: T(`ctx.who.${ctx.channel}`), totalPct: ltr(`${ctx.totalPct}%`), marginPct: ltr(`${ctx.marginPct}%`), collected: ltr(ctx.collected) };
-  const shareText = ['high', 'noticeable', 'close'].includes(verdict.status)
-    ? T('share.text', { from, to, cost: costPlain, pct: pctText })
-    : T('share.textPlain', { from, to });
+  const pct = Math.abs(verdict.costPct);
+  const pctText = `${pct.toFixed(pct < 10 ? 1 : 0)}%`;
+  const costPlain = fmtMoney(aboutRound(verdict.displayCost), verdict.displayCurrency);
+  const vars = { cost: ltr(costPlain), pct: ltr(pctText), margin: ltr(`${(bench.marginPct ?? 0).toFixed(1)}%`) };
+
+  if (verdict.status === 'implausible') {
+    host.innerHTML = `<div class="card verdict none"><p class="headline">${T('result.implausible', vars)}</p></div>`;
+    return;
+  }
+  const headline = {
+    cash: () => T(verdict.cost >= 0 ? 'result.cash.less' : 'result.cash.more', vars),
+    extreme: () => T('result.extreme', vars),
+    uncertain: () => T('result.uncertain', vars),
+    'about-market': () => T('result.about'),
+    better: () => T('result.better', vars),
+  }[verdict.status]?.() ?? T(mode === 'quote' ? 'result.cost.quote' : 'result.cost', vars);
+  const costly = ['high', 'noticeable', 'extreme'].includes(verdict.status);
+  const shareText = costly || verdict.status === 'close' ? T('share.text', { from, to, cost: costPlain, pct: pctText }) : plain;
   host.innerHTML = `<div class="card verdict ${verdict.status}">
     <div class="chip">${esc(T(`verdict.${verdict.status}`))}</div>
     <p class="headline">${headline}</p>
     <dl class="sums">
-      <div><dt>${esc(T('result.youGot'))}</dt><dd>${ltr(`${fmtAmount(received, to)} ${to}`)}</dd></div>
-      <div><dt>${esc(T('result.atBenchmark'))}</dt><dd>${ltr(`${fmtAmount(verdict.expected, to)} ${to}`)}</dd></div>
-      <div><dt>${esc(T('result.benchmark'))}</dt><dd>${ltr(`${fmtAmount(gave, from)} ${from} × ${fmtRate(bench.rate)}`)} <span class="muted small">${srcName}</span></dd></div>
+      <div><dt>${esc(T(mode === 'quote' ? 'result.wouldGet' : 'result.youGot'))}</dt><dd>${money(received, to)}</dd></div>
+      <div><dt>${esc(T('result.atBenchmark'))}</dt><dd>${money(verdict.expected, to)}</dd></div>
+      ${fee ? `<div><dt>${esc(T('result.total'))}</dt><dd>${money(verdict.total, from)}</dd></div>` : ''}
+      <div><dt>${esc(T('result.benchmark'))}</dt><dd>${ltr(`${fmtAmount(verdict.total, from)} ${from} × ${fmtRate(bench.rate)}`)} <span class="muted small">${srcName}</span></dd></div>
     </dl>
-    <p class="small">${grade}</p>
-    <p class="small">${T(ctx.key, ctxVars)}${ctx.url ? ` <a href="${esc(ctx.url)}" rel="noopener">${esc(T('ctx.link'))}</a>` : ''}</p>
+    <p class="small">${gradeLine}</p>
+    ${contextLine(channel, from, to)}
+    ${costly || verdict.status === 'cash' ? nextSteps() : ''}
     <p class="small muted">${esc(T('result.normal'))}</p>
     ${shareBar(shareText)}
   </div>`;
-  $('#copy-link')?.addEventListener('click', async (e) => {
-    try { await navigator.clipboard.writeText(url); e.target.textContent = T('share.copied'); } catch { e.target.textContent = url; }
-  });
+  bindCopy();
 }
 
 async function checkDeal(ev) {
   ev.preventDefault();
+  const mode = document.querySelector('input[name="mode"]:checked').value;
   const gave = parseAmount($('#deal-gave').value);
   const received = parseAmount($('#deal-received').value);
+  const fee = parseAmount($('#deal-fee').value) ?? 0;
   const from = $('#deal-from').value;
   const to = $('#deal-to').value;
-  const date = $('#deal-date').value || localToday();
+  const date = mode === 'quote' ? localToday() : $('#deal-date').value || localToday();
   const channel = $('#deal-channel').value;
-  if (!gave || !received) { state.deal = { error: 'deal.err.amounts' }; return renderDeal(); }
-  if (from === to) { state.deal = { error: 'deal.err.same' }; return renderDeal(); }
+  const fail = (error) => { state.deal = { error }; renderDeal(); };
+  if (!gave) return fail('deal.err.gave');
+  if (mode === 'done' && !received) return fail('deal.err.amounts');
+  if (from === to) return fail('deal.err.same');
+  if (!channel) return fail('deal.err.channel');
   state.deal = { loading: true }; renderDeal();
-  if (from !== state.from || to !== state.to) { state.from = from; state.to = to; syncSelects(); await loadPair(); }
+  if (from !== state.from || to !== state.to) { state.from = from; state.to = to; state.onPairPage = true; syncSelects(); await loadPair(); }
   try {
     // Only the pair and the date leave this device. The amounts never do.
     const bench = await api(`/api/benchmark?from=${from}&to=${to}&date=${date}`);
-    state.deal = { bench, gave, received, from, to, channel, verdict: assessDeal({ gave, received, from, to, benchmark: bench }) };
+    state.deal = { bench, gave, fee, received, from, to, channel, mode, verdict: assessDeal({ gave, fee, received, from, to, channel, benchmark: bench }) };
   } catch {
     state.deal = { error: 'deal.err.fetch' };
   }
@@ -194,12 +249,21 @@ async function checkDeal(ev) {
   $('#deal-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function applyMode() {
+  const quote = document.querySelector('input[name="mode"]:checked').value === 'quote';
+  $('#gave-label').dataset.i18n = quote ? 'deal.gave.quote' : 'deal.gave';
+  $('#received-label').dataset.i18n = quote ? 'deal.received.quote' : 'deal.received';
+  $('#date-field').hidden = quote;
+  $('#gave-label').textContent = T($('#gave-label').dataset.i18n);
+  $('#received-label').textContent = T($('#received-label').dataset.i18n);
+}
+
 /* ---------- render: rate ladder ---------- */
 function renderLadder() {
   const d = state.pair;
   const host = $('#ladder-card');
   if (!d?.ladder) {
-    host.innerHTML = `<p class="muted">${esc(T('ladder.none'))} <a href="/usd-to-pkr">${esc(T('ladder.goto'))}</a></p>`;
+    host.innerHTML = `<p class="muted">${esc(T('ladder.none'))} <a href="${state.lang === 'ur' ? '/ur' : ''}/usd-to-pkr">${esc(T('ladder.goto'))}</a></p>`;
     return;
   }
   const l = d.ladder;
@@ -446,12 +510,12 @@ async function loadHistory() {
   renderChart();
 }
 
-function changePair() { state.deal = null; renderDeal(); syncSelects(); loadPair(); }
+function changePair() { state.onPairPage = true; state.deal = null; renderDeal(); syncSelects(); loadPair(); }
 
 async function init() {
   readUrl();
   const saved = store.get('tr.lang');
-  state.lang = saved === 'ur' || saved === 'en' ? saved : (navigator.language || '').toLowerCase().startsWith('ur') ? 'ur' : 'en';
+  state.lang = state.pathLang ?? (saved === 'ur' || saved === 'en' ? saved : (navigator.language || '').toLowerCase().startsWith('ur') ? 'ur' : 'en');
   applyLanguage();
   try {
     const meta = await api('/api/currencies');
@@ -472,8 +536,10 @@ async function init() {
     state.lang = state.lang === 'ur' ? 'en' : 'ur';
     store.set('tr.lang', state.lang);
     renderEverything();
+    writeUrl();
   });
   $('#deal').addEventListener('submit', checkDeal);
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', () => { state.deal = null; renderDeal(); applyMode(); }));
   for (const [id, key] of [['#from', 'from'], ['#deal-from', 'from'], ['#to', 'to'], ['#deal-to', 'to']]) {
     $(id).addEventListener('change', (e) => { state[key] = e.target.value; changePair(); });
   }

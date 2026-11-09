@@ -5,7 +5,7 @@
   --border: #dde3ec;
   --text: #121a2b;
   --text-2: #4b5567;
-  --muted: #7a8498;
+  --muted: #5f6b80;
   --accent: #0f766e;
   --accent-ink: #0b5e58;
   --accent-soft: #d8f1ee;
@@ -178,13 +178,29 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .primary:focus-visible, .lang:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .privacy { margin: 0; color: var(--text-2); }
 .deal-result { margin-top: 14px; }
+.mode { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; font-weight: 600; }
+.mode label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.pair-summary { max-width: 64ch; font-weight: 600; margin-bottom: 18px; }
+.pair-summary:empty { display: none; }
+/* On a pair page the summary does the lede's job, so the form stays near the top of a phone. */
+.lede:has(+ .pair-summary:not(:empty)) { display: none; }
+.next { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: .9rem; }
+.next ul { margin: 4px 0 0; padding-inline-start: 1.1em; }
+.qa { padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.qa:last-child { border-bottom: 0; }
+.qa summary { cursor: pointer; font-weight: 600; }
+.qa p { margin: 8px 0 0; color: var(--text-2); }
+.pairs { display: flex; flex-wrap: wrap; gap: 8px; }
+.pairs a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; font-size: .9rem; }
+.pairs a:hover { border-color: var(--accent); }
+[hidden] { display: none !important; }
 .deal-result:empty { display: none; }
 .verdict { border-inline-start: 5px solid var(--border); }
-.verdict.high { border-inline-start-color: var(--bad); }
+.verdict.high, .verdict.extreme { border-inline-start-color: var(--bad); }
 .verdict.noticeable { border-inline-start-color: var(--warn); }
 .verdict.close, .verdict.about-market, .verdict.better { border-inline-start-color: var(--good); }
 .chip { display: inline-block; font-size: .8rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); margin-bottom: 8px; }
-.verdict.high .chip { background: var(--bad-soft); color: var(--bad); }
+.verdict.high .chip, .verdict.extreme .chip { background: var(--bad-soft); color: var(--bad); }
 .verdict.noticeable .chip { background: var(--warn-soft); color: var(--warn); }
 .verdict.close .chip, .verdict.about-market .chip, .verdict.better .chip { background: var(--good-soft); color: var(--good); }
 .headline { font-size: clamp(1.15rem, 3.6vw, 1.45rem); font-weight: 700; line-height: 1.35; }

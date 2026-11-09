@@ -38,7 +38,7 @@ How the price is made: exporters bring dollars in, importers need dollars out. B
 | 1. Interbank (where the price is made) | SBP, Mark-to-Market revaluation rate ("ready") | "weighted average of closing interbank exchange rate collected through Brokerage Houses" | 276.7040 | |
 | 2. Banks to customers | SBP, Weighted Average Customer Exchange Rates | "an estimate of the Exchange Rates quoted by various Commercial Banks to their clients … compiled from the Exchange Rate sheets issued daily by various Commercial Banks" | 276.3921 | 276.8490 |
 | 3. Open market (cash, money changers) | ECAP, published on SBP's site | "provided by Exchange Companies Association of Pakistan (ECAP) … published for information only" | 277.35 | 278.48 |
-| For comparison | TrueRate market median (4 global aggregators) | median of feeds; their own methods are largely undisclosed | 276.54 | |
+| For comparison | TrueRate market median (the 4 aggregators used on that date) | median of feeds; their own methods are largely undisclosed | 276.54 | |
 
 The open-market selling rate was 0.64% above interbank; the bank selling rate was 0.05% above it.
 
@@ -71,7 +71,7 @@ The file names are **not consistent**: the day may or may not have a leading zer
 ## 4. What stays hidden
 
 - **Individual trades.** Global FX turnover was about **$9.6 trillion per day** in April 2025 ([BIS Triennial Survey](https://www.bis.org/press/p250930.htm)). It trades over the counter on dealer platforms whose tick data is paid. Central banks publish only end-of-day aggregates, never each trade.
-- **Aggregators' methods.** The free feeds TrueRate uses today (ExchangeRate-API, Currency-API, FloatRates, MoneyConvert) republish mid-rates but do not fully disclose where they get them or how they combine them.
+- **Aggregators' methods.** Free feeds such as Currency-API and FloatRates republish mid-rates but do not fully disclose where they get them or how they combine them.
 
 ## 5. Design principles that follow
 

@@ -1,6 +1,6 @@
 # Product direction: from a rate site to a fair-price check
 
-Notes from 6 November 2026. **Status: the deal check, a hand-entered USD/PKR ladder and Urdu are built, and the deal check asks for amounts rather than a quoted rate. Corridors, crowd quotes, alerts and country packs are not built.** Every figure below was found by web search on that date. Most come from news sites and search summaries, not from the original documents, so check a figure at its source before publishing it.
+Notes from 6 November 2026. **Status: the deal and quote checks, a hand-entered USD/PKR ladder and Urdu are built. The check asks for amounts rather than a quoted rate, and gives no verdict on cash deals until fresh dealer prices exist. Corridors, crowd quotes, alerts and country packs are not built.** Every figure below was found by web search on that date. Most come from news sites and search summaries, not from the original documents, so check a figure at its source before publishing it.
 
 ## 1. The goal, sharpened
 

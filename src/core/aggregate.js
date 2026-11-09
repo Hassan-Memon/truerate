@@ -11,6 +11,8 @@ import CURRENCIES from './currencies.json' with { type: 'json' };
 const STALE_MS = 48 * 3600 * 1000;
 /** Central banks skip weekends and holidays, so Friday's figure is still current on Monday: count whole days. */
 const OFFICIAL_STALE_DAYS = 3;
+/** Beyond this gap between market feeds and central banks, no single number is honest. */
+const CONFLICT_PCT = 20;
 const isOldDate = (date, now) => !!date && Math.floor((now - Date.parse(`${date}T00:00:00Z`)) / 86400e3) > OFFICIAL_STALE_DAYS;
 
 /**
@@ -67,6 +69,8 @@ function marketView(quotes) {
     quotes: quotes.map((q) => ({ ...q, rate: sig(q.rate, 8), devPct: split ? null : m ? round(((q.rate - m) / m) * 100, 4) : 0 })),
   };
 }
+
+const conflictGroups = (mv, ov) => [{ min: mv.median, max: mv.median, n: mv.n }, { min: ov.rate, max: ov.rate, n: ov.n }].sort((a, b) => a.min - b.min);
 
 function officialView(q, providers, home, now) {
   if (!q) return null;
@@ -125,10 +129,12 @@ export function buildSnapshot({ market, official, now = Date.now() }) {
       ov = officialView(official.quotes?.[code], providers, home, now);
     }
 
-    const split = !!mv?.noConsensus;
+    const rawGap = mv?.median && ov ? ((ov.rate - mv.median) / mv.median) * 100 : null;
+    const split = !!mv?.noConsensus || Math.abs(rawGap ?? 0) > CONFLICT_PCT;
+    if (split && mv && !mv.noConsensus) mv.groups = conflictGroups(mv, ov);
     const rate = split ? null : mv ? mv.median : ov ? ov.rate : null;
     if (!rate && !split) continue;
-    const gapPct = rate && ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
+    const gapPct = rate && rawGap !== null ? round(rawGap, 4) : null;
     const staleCount = quotes.filter((q) => q.asOf && now - Date.parse(q.asOf) > STALE_MS).length;
     const agreement = agreementFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov, split, groups: mv?.groups, feedAgeHours: mv?.feedAgeHours });
 
@@ -203,10 +209,12 @@ export function pairDetail(snapshot, from, to) {
     };
   }
 
-  const split = !!mv?.noConsensus;
+  const rawGap = mv?.median && ov ? ((ov.rate - mv.median) / mv.median) * 100 : null;
+  const split = !!mv?.noConsensus || Math.abs(rawGap ?? 0) > CONFLICT_PCT;
+  if (split && mv && !mv.noConsensus) mv.groups = conflictGroups(mv, ov);
   const rate = split ? null : mv ? mv.median : ov ? ov.rate : null;
   if (!rate && !split) return null;
-  const gapPct = rate && ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
+  const gapPct = rate && rawGap !== null ? round(rawGap, 4) : null;
   const now = Date.parse(snapshot.generatedAt);
   const staleCount = quotes.filter((q) => q.asOf && now - Date.parse(q.asOf) > STALE_MS).length;
   const agreement = agreementFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov, split, groups: mv?.groups, feedAgeHours: mv?.feedAgeHours });

@@ -6,7 +6,7 @@ import { TtlCache } from './core/cache.js';
 import { loadMarketSources, fetchJson } from './core/sources.js';
 import { loadOfficial } from './core/official.js';
 import { buildSnapshot, pairDetail, ratesTable } from './core/aggregate.js';
-import { gradeBenchmark, liveBenchmark, historyPointFor } from './core/benchmark.js';
+import { gradeBenchmark, liveBenchmark, historyPointFor, weekRangePct } from './core/benchmark.js';
 import CURRENCIES from './core/currencies.json' with { type: 'json' };
 
 export const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
@@ -68,7 +68,23 @@ async function getBenchmark(from, to, date, opts) {
   }, { ttlMs: HISTORY_TTL_MS });
   const point = historyPointFor(points, date);
   if (!point) return { ...blocked, grade: 'none', reason: 'no-history' };
-  return { ...base, rate: point.rate, low: point.rate, high: point.rate, marginPct: Math.max(0.5, liveView?.marginPct ?? 0), rateDate: point.date, source: 'central-bank-history' };
+  return { ...base, rate: point.rate, low: point.rate, high: point.rate, marginPct: Math.max(0.5, liveView?.marginPct ?? 0, weekRangePct(points)), rateDate: point.date, source: 'central-bank-history' };
+}
+
+/**
+ * Today's median for a server-rendered page, if it is safe to show. A slow upstream must never
+ * hold a page back, so this gives up quickly and the page simply renders without the number.
+ */
+export async function publishableRate(from, to, opts = {}, waitMs = 1500) {
+  let timer;
+  const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), waitMs); });
+  const lookup = (async () => {
+    const d = pairDetail(await getSnapshot(opts), from, to);
+    return d && gradeBenchmark(d).grade !== 'none' ? d.rate : null;
+  })().catch(() => null);
+  const rate = await Promise.race([lookup, timeout]);
+  clearTimeout(timer);
+  return rate;
 }
 
 /** All of one institution's USD quotes; used when the issuing bank is missing from the live view. */

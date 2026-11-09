@@ -20,7 +20,8 @@ export function ladderFor(from, to, now = Date.now()) {
 }
 
 /**
- * cross-checked: market feeds and central-bank figures agree closely. Still not a price you can trade at.
+ * sources-agree: market feeds and central-bank figures are close. They may copy each other, so this
+ *                never proves anyone can trade at this rate.
  * limited:       only one kind of source, or a wide gap between them.
  * none:          we know this number would mislead, so we give no verdict.
  */
@@ -31,7 +32,7 @@ export function gradeBenchmark(detail) {
   if (Number.isFinite(detail.gapPct) && Math.abs(detail.gapPct) > 5) return { grade: 'none', reason: 'source-conflict' };
   if (!detail.market || !detail.official) return { grade: 'limited', reason: 'single-kind' };
   if (detail.market.spreadPct > 1.5 || Math.abs(detail.gapPct ?? 0) > 1.5) return { grade: 'limited', reason: 'wide' };
-  return { grade: 'cross-checked', reason: null };
+  return { grade: 'sources-agree', reason: null };
 }
 
 /** The live yardstick, with a margin no verdict should claim to see inside. */
@@ -40,6 +41,14 @@ export function liveBenchmark(detail) {
   const low = Math.min(...pts);
   const high = Math.max(...pts);
   return { rate: detail.rate, low, high, marginPct: Math.max(0.25, ((high - low) / detail.rate) * 50) };
+}
+
+/** A rate from days before the deal is only as good as the pair's movement that week. */
+export function weekRangePct(points) {
+  const rates = points.map((p) => p.rate);
+  if (rates.length < 2) return 0;
+  const mid = (Math.max(...rates) + Math.min(...rates)) / 2;
+  return ((Math.max(...rates) - Math.min(...rates)) / mid) * 50;
 }
 
 /** Latest published point on or before the date, if it is within a week of it. */

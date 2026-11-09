@@ -13,7 +13,8 @@
     "test": "node --test \"test/*.test.js\"",
     "currencies": "node scripts/build-currencies.mjs",
     "deploy": "npx wrangler@4 deploy",
-    "preview": "npx wrangler@4 dev"
+    "preview": "npx wrangler@4 dev",
+    "sitemap": "node scripts/build-sitemap.mjs"
   },
   "license": "MIT"
 }
