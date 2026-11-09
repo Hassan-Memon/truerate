@@ -66,7 +66,7 @@ The file names are **not consistent**: the day may or may not have a leading zer
 
 - **ECAP and weighted-average PDFs: yes.** TrueType fonts with WinAnsi encoding. The page streams are Flate-compressed (Node `zlib`, or `DecompressionStream('deflate')` on Workers) and the text is plain literal strings in reading order.
 - **M2M PDF: partly.** It mixes in Identity-H (CID) fonts with hex strings, which need the font's ToUnicode map. The SBP homepage widget gives the USD figure as HTML.
-- **Risk:** SBP's site has bot protection. A plain request worked from a home connection, but requests from Cloudflare's data centres may be blocked. Fallback: a free scheduled GitHub Action that fetches the files daily and publishes parsed JSON.
+- **Access:** SBP's site has bot protection. A plain request worked from a home connection on 4 Nov, but `/economic-data` returned 403 to a scripted request on 9 Nov. We treat that as SBP's decision and do not work around it, so the site's ladder is entered by hand from the published documents. Automatic reading needs SBP's permission or a data route SBP offers.
 
 ## 4. What stays hidden
 

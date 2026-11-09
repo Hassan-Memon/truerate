@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://truerate.truerate-app.workers.dev/</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/usd-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/pkr-to-usd</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/sar-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/pkr-to-sar</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/aed-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/gbp-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/eur-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/cad-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/aud-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/qar-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/omr-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/kwd-to-pkr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/usd-to-inr</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/usd-to-eur</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/eur-to-usd</loc></url>
+  <url><loc>https://truerate.truerate-app.workers.dev/gbp-to-usd</loc></url>
+</urlset>

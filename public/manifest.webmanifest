@@ -1,7 +1,7 @@
 {
   "name": "TrueRate",
   "short_name": "TrueRate",
-  "description": "Consensus exchange rates with every source shown.",
+  "description": "Check what a currency deal really cost you, against the market rate that day.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f8fb",

@@ -1,15 +1,28 @@
 /**
  * Turns raw source payloads into one snapshot: for every currency, a consensus rate,
- * the full spread across sources, the official central-bank view, and a confidence score.
+ * the full spread across sources, the official central-bank view, and how well the sources agree.
  * Pure functions only: no network, no clocks except the `now` you pass in.
  */
-import { median, mean, spreadPct, sig, round } from './stats.js';
+import { median, mean, spreadPct, sig, round, rateGroups } from './stats.js';
 import { homeProvider } from './official.js';
+import { regimeFor, ladderFor } from './benchmark.js';
 import CURRENCIES from './currencies.json' with { type: 'json' };
 
 const STALE_MS = 48 * 3600 * 1000;
+/** Central banks skip weekends and holidays, so Friday's figure is still current on Monday: count whole days. */
+const OFFICIAL_STALE_DAYS = 3;
+const isOldDate = (date, now) => !!date && Math.floor((now - Date.parse(`${date}T00:00:00Z`)) / 86400e3) > OFFICIAL_STALE_DAYS;
 
-export function confidenceFor({ n, spread, gapPct, staleCount, hasOfficial }) {
+/**
+ * How well the sources agree with each other. This is all it measures: feeds that copy the
+ * same official rate agree perfectly even where nobody can trade at it, so it must never be
+ * presented as trust in the number.
+ */
+export function agreementFor({ n, spread, gapPct, staleCount, hasOfficial, split = false, groups = [], feedAgeHours = 0 }) {
+  if (split) {
+    const near = groups.map((g) => sig(g.min, 4)).join(' and ');
+    return { score: 0, label: 'split', reasons: [`sources split into separate groups (near ${near}), so there is no consensus`] };
+  }
   let score = 100;
   const reasons = [];
   if (n === 0) { score -= 45; reasons.push('no live market source; official rate only'); }
@@ -27,25 +40,35 @@ export function confidenceFor({ n, spread, gapPct, staleCount, hasOfficial }) {
     if (g >= 1) reasons.push(`official rate is ${round(g, 2)}% ${gapPct > 0 ? 'above' : 'below'} market`);
   } else if (!hasOfficial) { score -= 5; reasons.push('no central-bank quote to cross-check'); }
   if (staleCount) { score -= 5 * staleCount; reasons.push(`${staleCount} source${staleCount > 1 ? 's' : ''} older than 48h`); }
+  if (feedAgeHours > 24 && spread > 0) reasons.push(`feeds were collected up to ${Math.round(feedAgeHours)} hours apart, so some of this spread is timing`);
   score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, label: score >= 80 ? 'high' : score >= 55 ? 'medium' : 'low', reasons };
+  return { score, label: score >= 80 ? 'strong' : score >= 55 ? 'partial' : 'weak', reasons };
+}
+
+function feedAge(quotes) {
+  const times = quotes.map((q) => Date.parse(q.asOf)).filter(Number.isFinite);
+  return times.length > 1 ? (Math.max(...times) - Math.min(...times)) / 3600e3 : 0;
 }
 
 function marketView(quotes) {
   const rates = quotes.map((q) => q.rate);
   const m = median(rates);
+  const { groups, split } = rateGroups(rates);
   return {
-    median: sig(m, 8),
+    median: split ? null : sig(m, 8),
+    noConsensus: split,
+    groups: split ? groups.map((g) => ({ min: sig(g.min, 8), max: sig(g.max, 8), n: g.n })) : [],
+    feedAgeHours: round(feedAge(quotes), 1),
     mean: sig(mean(rates), 8),
     min: sig(Math.min(...rates), 8),
     max: sig(Math.max(...rates), 8),
     n: quotes.length,
     spreadPct: round(spreadPct(rates), 4),
-    quotes: quotes.map((q) => ({ ...q, rate: sig(q.rate, 8), devPct: m ? round(((q.rate - m) / m) * 100, 4) : 0 })),
+    quotes: quotes.map((q) => ({ ...q, rate: sig(q.rate, 8), devPct: split ? null : m ? round(((q.rate - m) / m) * 100, 4) : 0 })),
   };
 }
 
-function officialView(q, providers, home) {
+function officialView(q, providers, home, now) {
   if (!q) return null;
   const included = q.providers.filter((p) => !p.excluded).map((p) => p.rate);
   const rate = q.rate;
@@ -65,12 +88,13 @@ function officialView(q, providers, home) {
       rate: sig(p.rate, 8),
       date: p.date,
       excluded: p.excluded,
+      stale: isOldDate(p.date, now),
       devPct: rate ? round(((p.rate - rate) / rate) * 100, 4) : 0,
     })),
     home: home ? {
       key: home.key, name: home.name, country: home.country, rateType: home.rateType, url: home.url,
       rate: homeQuote ? sig(homeQuote.rate, 8) : null, date: homeQuote?.date ?? home.lastDate ?? null,
-      excluded: homeQuote?.excluded ?? false, stale: !homeQuote,
+      excluded: homeQuote?.excluded ?? false, stale: !homeQuote || isOldDate(homeQuote.date, now),
     } : null,
   };
 }
@@ -98,16 +122,17 @@ export function buildSnapshot({ market, official, now = Date.now() }) {
       ov = official.ok ? { rate: 1, date: official.asOf?.slice(0, 10) ?? null, n: 0, nIncluded: 0, min: 1, max: 1, quotes: [], home: null } : null;
     } else {
       const home = homeProvider(code, providers, meta.country);
-      ov = officialView(official.quotes?.[code], providers, home);
+      ov = officialView(official.quotes?.[code], providers, home, now);
     }
 
-    const rate = mv ? mv.median : ov ? ov.rate : null;
-    if (!rate) continue;
-    const gapPct = ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
+    const split = !!mv?.noConsensus;
+    const rate = split ? null : mv ? mv.median : ov ? ov.rate : null;
+    if (!rate && !split) continue;
+    const gapPct = rate && ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
     const staleCount = quotes.filter((q) => q.asOf && now - Date.parse(q.asOf) > STALE_MS).length;
-    const confidence = confidenceFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov });
+    const agreement = agreementFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov, split, groups: mv?.groups, feedAgeHours: mv?.feedAgeHours });
 
-    currencies[code] = { code, ...meta, rate: sig(rate, 8), inverse: sig(1 / rate, 8), market: mv, official: ov, gapPct, confidence };
+    currencies[code] = { code, ...meta, rate: rate ? sig(rate, 8) : null, inverse: rate ? sig(1 / rate, 8) : null, noConsensus: split, market: mv, official: ov, gapPct, agreement };
   }
 
   const sources = [
@@ -163,7 +188,7 @@ export function pairDetail(snapshot, from, to) {
       const h = cur.official.home;
       if (!h) continue;
       const q = list.find((p) => p.key === h.key);
-      if (q) homes.push({ ...h, side, currency: cur.code, rate: sig(q.rate, 8), date: q.date, excluded: q.excluded });
+      if (q) homes.push({ ...h, side, currency: cur.code, rate: sig(q.rate, 8), date: q.date, excluded: q.excluded, stale: isOldDate(q.date, Date.parse(snapshot.generatedAt)) });
     }
     ov = {
       rate: sig(rate, 8),
@@ -172,24 +197,28 @@ export function pairDetail(snapshot, from, to) {
       nIncluded: included.length,
       min: included.length ? sig(Math.min(...included), 8) : null,
       max: included.length ? sig(Math.max(...included), 8) : null,
-      quotes: list.map((p) => ({ ...p, rate: sig(p.rate, 8), devPct: rate ? round(((p.rate - rate) / rate) * 100, 4) : 0 }))
+      quotes: list.map((p) => ({ ...p, rate: sig(p.rate, 8), stale: isOldDate(p.date, Date.parse(snapshot.generatedAt)), devPct: rate ? round(((p.rate - rate) / rate) * 100, 4) : 0 }))
         .sort((x, y) => Number(x.excluded) - Number(y.excluded) || x.key.localeCompare(y.key)),
       homes,
     };
   }
 
-  const rate = mv ? mv.median : ov ? ov.rate : null;
-  if (!rate) return null;
-  const gapPct = ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
+  const split = !!mv?.noConsensus;
+  const rate = split ? null : mv ? mv.median : ov ? ov.rate : null;
+  if (!rate && !split) return null;
+  const gapPct = rate && ov && mv ? round(((ov.rate - mv.median) / mv.median) * 100, 4) : null;
   const now = Date.parse(snapshot.generatedAt);
   const staleCount = quotes.filter((q) => q.asOf && now - Date.parse(q.asOf) > STALE_MS).length;
-  const confidence = confidenceFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov });
+  const agreement = agreementFor({ n: quotes.length, spread: mv?.spreadPct ?? 0, gapPct, staleCount, hasOfficial: !!ov, split, groups: mv?.groups, feedAgeHours: mv?.feedAgeHours });
 
-  const strip = ({ market: _m, official: _o, confidence: _c, gapPct: _g, ...meta }) => meta;
+  const strip = ({ market: _m, official: _o, agreement: _a, gapPct: _g, noConsensus: _n, ...meta }) => meta;
   return {
     from: strip(a), to: strip(b),
-    rate: sig(rate, 8), inverse: sig(1 / rate, 8),
-    market: mv, official: ov, gapPct, confidence,
+    rate: rate ? sig(rate, 8) : null, inverse: rate ? sig(1 / rate, 8) : null,
+    noConsensus: split,
+    market: mv, official: ov, gapPct, agreement,
+    regime: { from: regimeFor(from), to: regimeFor(to) },
+    ladder: ladderFor(from, to, now),
     feeds: snapshot.feeds ?? null,
     generatedAt: snapshot.generatedAt,
   };
@@ -221,8 +250,10 @@ export function ratesTable(snapshot, base = 'USD') {
       officialDate: d.official?.date ?? null,
       banks: d.official?.n ?? 0,
       gapPct: d.gapPct,
-      confidence: d.confidence.label,
-      score: d.confidence.score,
+      noConsensus: d.noConsensus,
+      noBenchmark: !!(d.regime.from?.noBenchmark || d.regime.to?.noBenchmark),
+      agreement: d.agreement.label,
+      score: d.agreement.score,
     };
   }
   const table = { base, generatedAt: snapshot.generatedAt, rates };

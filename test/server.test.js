@@ -42,13 +42,31 @@ test('serves assets with the right content types', async () => {
   }
 });
 
-test('extension-less unknown paths fall back to the app; missing files 404', async () => {
-  const spa = await fetch(base + '/usd-to-pkr');
-  assert.equal(spa.status, 200);
-  assert.match(await spa.text(), /<title>TrueRate/);
-  const missing = await fetch(base + '/nope.png');
-  assert.equal(missing.status, 404);
-  await missing.text();
+test('pair pages have their own metadata in the raw HTML', async () => {
+  const page = await fetch(base + '/sar-to-pkr');
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /<title>SAR to PKR: /);
+  assert.match(html, /<link rel="canonical" href="[^"]*\/sar-to-pkr"/);
+  assert.match(html, /property="og:title" content="SAR to PKR: /);
+  const legacy = await (await fetch(base + '/?from=SAR&to=PKR')).text();
+  assert.match(legacy, /<title>SAR to PKR: /);
+});
+
+test('unknown paths are real 404s, never the app with a 200', async () => {
+  for (const p of ['/nonsense-page', '/nope.png', '/abc-to-xyz']) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 404, p);
+    assert.match(await r.text(), /Page not found/, p);
+  }
+});
+
+test('the sitemap is a real sitemap and robots.txt points to it', async () => {
+  const map = await fetch(base + '/sitemap.xml');
+  assert.equal(map.status, 200);
+  assert.match(map.headers.get('content-type'), /xml/);
+  assert.match(await map.text(), /<urlset/);
+  assert.match(await (await fetch(base + '/robots.txt')).text(), /Sitemap: https:.*sitemap\.xml/);
 });
 
 test('path traversal cannot escape public/', async () => {

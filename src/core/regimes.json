@@ -1,0 +1,50 @@
+{
+  "PKR": {
+    "kind": "managed",
+    "decider": { "en": "The interbank market, with the State Bank of Pakistan stepping in to prevent disorder.", "ur": "انٹر بینک مارکیٹ۔ بے ترتیبی روکنے کے لیے اسٹیٹ بینک آف پاکستان مداخلت کرتا ہے۔" },
+    "quote": "Pakistan has a market based flexible exchange rate system, where the exchange rate is determined by market demand and supply conditions.",
+    "source": { "label": "State Bank of Pakistan", "url": "https://www.sbp.org.pk/our-operations/financial-market/exchange-rate-regime-and-fx-reserve-management", "checked": "2026-11-04" }
+  },
+  "SAR": {
+    "kind": "peg",
+    "peg": { "base": "USD", "rate": 3.75 },
+    "decider": { "en": "The Saudi Central Bank, by policy: fixed against the US dollar.", "ur": "سعودی مرکزی بینک، پالیسی کے تحت: امریکی ڈالر کے مقابلے میں مقرر۔" },
+    "source": { "label": "Asharq Al-Awsat, reporting SAMA's statement", "url": "https://english.aawsat.com/home/article/2268611/sama-committed-pegging-sar-us-dollar-strategic-choice", "checked": "2026-11-09" }
+  },
+  "AED": {
+    "kind": "peg",
+    "peg": { "base": "USD", "rate": 3.6725 },
+    "decider": { "en": "The UAE, by policy: fixed against the US dollar since 1997.", "ur": "متحدہ عرب امارات، پالیسی کے تحت: 1997 سے امریکی ڈالر کے مقابلے میں مقرر۔" },
+    "source": { "label": "The National", "url": "https://www.thenationalnews.com/lifestyle/2024/11/22/uae-dirham-dollar-peg/", "checked": "2026-11-09" }
+  },
+  "HKD": {
+    "kind": "band",
+    "peg": { "base": "USD", "low": 7.75, "high": 7.85 },
+    "decider": { "en": "The Hong Kong Monetary Authority, which commits to trade US dollars at both ends of a fixed band.", "ur": "ہانگ کانگ مانیٹری اتھارٹی، جو ایک مقررہ حد کے دونوں سروں پر امریکی ڈالر کی خرید و فروخت کا وعدہ کرتی ہے۔" },
+    "source": { "label": "Hong Kong Monetary Authority", "url": "https://www.hkma.gov.hk/eng/key-functions/money/linked-exchange-rate-system/how-does-the-lers-work/", "checked": "2026-11-09" }
+  },
+  "MMK": {
+    "kind": "multi",
+    "noBenchmark": true,
+    "decider": { "en": "The central bank's reference rate has stayed near 2,100 per dollar, while reporting puts the market rate far above it (near 4,900 in October 2026).", "ur": "مرکزی بینک کا حوالہ جاتی ریٹ تقریباً 2,100 فی ڈالر پر ہے، جبکہ رپورٹس کے مطابق مارکیٹ ریٹ اس سے بہت زیادہ ہے (اکتوبر 2026 میں تقریباً 4,900)۔" },
+    "source": { "label": "The Irrawaddy", "url": "https://www.irrawaddy.com/news/burma/myanmar-plunges-deeper-into-dollar-crisis-under-military-rule.html", "checked": "2026-11-09" }
+  },
+  "VES": {
+    "kind": "multi",
+    "noBenchmark": true,
+    "decider": { "en": "The central bank publishes an official rate, and a separate parallel rate has been reported 10–30% away from it during 2026.", "ur": "مرکزی بینک سرکاری ریٹ جاری کرتا ہے، جبکہ 2026 میں الگ متوازی ریٹ اس سے 10 تا 30 فیصد مختلف رپورٹ ہوا۔" },
+    "source": { "label": "Rio Times", "url": "https://www.riotimesonline.com/venezuela-exchange-rate-gap-collapse-2026/", "checked": "2026-11-09" }
+  },
+  "IRR": {
+    "kind": "multi",
+    "noBenchmark": true,
+    "decider": { "en": "Official and open-market rates differ widely. The open market was reported at about 2.41 million rials per dollar in September 2026.", "ur": "سرکاری اور اوپن مارکیٹ ریٹ میں بڑا فرق ہے۔ ستمبر 2026 میں اوپن مارکیٹ تقریباً 24 لاکھ 10 ہزار ریال فی ڈالر رپورٹ ہوئی۔" },
+    "source": { "label": "Iran International", "url": "https://www.iranintl.com/en/202609289095", "checked": "2026-11-09" }
+  },
+  "SYP": {
+    "kind": "redenominated",
+    "noBenchmark": true,
+    "decider": { "en": "Syria removed two zeros from its pound on 1 January 2026. Our feeds still differ by about 100 times, which matches feeds using the old and new scales.", "ur": "شام نے یکم جنوری 2026 کو اپنے پاؤنڈ سے دو صفر ہٹا دیے۔ ہمارے ذرائع میں اب بھی تقریباً 100 گنا فرق ہے، جو پرانے اور نئے پیمانے کے فرق سے میل کھاتا ہے۔" },
+    "source": { "label": "Al Jazeera", "url": "https://www.aljazeera.com/economy/2026/1/5/syrias-new-currency-removes-al-assad-family-images-seeks-to-boost-economy", "checked": "2026-11-09" }
+  }
+}

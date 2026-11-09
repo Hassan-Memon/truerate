@@ -6,6 +6,7 @@ import { TtlCache } from './core/cache.js';
 import { loadMarketSources, fetchJson } from './core/sources.js';
 import { loadOfficial } from './core/official.js';
 import { buildSnapshot, pairDetail, ratesTable } from './core/aggregate.js';
+import { gradeBenchmark, liveBenchmark, historyPointFor } from './core/benchmark.js';
 import CURRENCIES from './core/currencies.json' with { type: 'json' };
 
 export const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
@@ -31,6 +32,43 @@ async function getHistory(from, to, days, opts) {
     const points = body.filter((r) => r.rate > 0).map((r) => ({ date: r.date, rate: r.rate })).sort((x, y) => x.date.localeCompare(y.date));
     return { from, to, days, source: 'frankfurter', points };
   }, { ttlMs: HISTORY_TTL_MS });
+}
+
+const utcToday = () => new Date().toISOString().slice(0, 10);
+const shiftDate = (ymd, days) => new Date(Date.parse(`${ymd}T00:00:00Z`) + days * 86400e3).toISOString().slice(0, 10);
+function validDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === v;
+}
+
+/**
+ * The yardstick for one deal. The browser does the arithmetic, so amounts never reach this
+ * server: it only ever learns the pair and the date.
+ */
+async function getBenchmark(from, to, date, opts) {
+  const today = utcToday();
+  const live = !date || date >= today;
+  let detail = null;
+  try { detail = pairDetail(await getSnapshot(opts), from, to); } catch (err) { if (live) throw err; }
+  if (live && !detail) return null;
+
+  const { grade, reason } = detail ? gradeBenchmark(detail) : { grade: 'limited', reason: 'single-kind' };
+  const base = { from, to, requestedDate: date ?? today, grade, reason, generatedAt: new Date().toISOString() };
+  const blocked = { ...base, rate: null, low: null, high: null, marginPct: null, rateDate: null, source: null };
+  if (grade === 'none') return blocked;
+
+  const liveView = detail?.rate ? liveBenchmark(detail) : null;
+  if (live) return { ...base, ...liveView, rateDate: today, source: detail.market ? 'market-median' : 'central-bank-consensus' };
+
+  const points = await cache.get(`benchmark:${from}:${to}:${date}`, async () => {
+    const url = `https://api.frankfurter.dev/v2/rates?base=${from.toLowerCase()}&quotes=${to.toLowerCase()}&from=${shiftDate(date, -7)}&to=${date}`;
+    const { body } = await fetchJson(url, opts);
+    return body.filter((r) => r.rate > 0).map((r) => ({ date: r.date, rate: r.rate }));
+  }, { ttlMs: HISTORY_TTL_MS });
+  const point = historyPointFor(points, date);
+  if (!point) return { ...blocked, grade: 'none', reason: 'no-history' };
+  return { ...base, rate: point.rate, low: point.rate, high: point.rate, marginPct: Math.max(0.5, liveView?.marginPct ?? 0), rateDate: point.date, source: 'central-bank-history' };
 }
 
 /** All of one institution's USD quotes; used when the issuing bank is missing from the live view. */
@@ -81,7 +119,8 @@ const code = (v, fallback) => {
 
 const ROUTES = {
   '/api': 'index of endpoints',
-  '/api/rates?base=USD': 'every currency against a base: consensus rate, spread, official rate, confidence',
+  '/api/rates?base=USD': 'every currency against a base: consensus rate, spread, official rate, source agreement',
+  '/api/benchmark?from=USD&to=PKR&date=2026-11-04': 'the rate a deal is measured against on a date, its margin of error and its grade',
   '/api/pair?from=USD&to=PKR': 'one pair in full detail: every market source and every central bank',
   '/api/convert?from=USD&to=PKR&amount=100': 'convert an amount, with the low/high band across sources',
   '/api/history?from=USD&to=PKR&days=30': 'daily official history for charting',
@@ -130,13 +169,27 @@ export async function handleApi(request, opts = {}) {
       return json({
         from, to, amount,
         rate: d.rate,
-        result: amount * d.rate,
+        noConsensus: d.noConsensus,
+        result: d.rate ? amount * d.rate : null,
         low: d.market ? amount * d.market.min : null,
         high: d.market ? amount * d.market.max : null,
         official: d.official ? amount * d.official.rate : null,
-        confidence: d.confidence,
+        agreement: d.agreement,
         generatedAt: d.generatedAt,
       });
+    }
+
+    if (p === '/api/benchmark') {
+      const from = code(q.get('from'), 'USD');
+      const to = code(q.get('to'), 'PKR');
+      const date = q.get('date') || null;
+      if (!from || !to) return json({ error: 'from and to must be 3-letter currency codes' }, { status: 400 });
+      if (date && !validDate(date)) return json({ error: 'date must be a real date written YYYY-MM-DD' }, { status: 400 });
+      // A day of grace: it is already tomorrow in Karachi for hours before it is in UTC.
+      if (date && date > shiftDate(utcToday(), 1)) return json({ error: 'date cannot be in the future' }, { status: 400 });
+      if (date && date < '2015-01-01') return json({ error: 'date is too far in the past' }, { status: 400 });
+      const b = await getBenchmark(from, to, date, opts);
+      return b ? json(b) : json({ error: `no data for ${from}/${to}` }, { status: 404 });
     }
 
     if (p === '/api/history') {
