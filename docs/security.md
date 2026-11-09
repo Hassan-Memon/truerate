@@ -1,7 +1,7 @@
 # Security posture
 
 What is enforced on this repository, how to verify it, and what is knowingly
-still missing. Audited 2026-11-06.
+still missing. Audited 2026-11-06, updated 2026-11-07.
 
 The application itself has a small attack surface by design:
 
@@ -30,7 +30,7 @@ The application itself has a small attack surface by design:
 | Dependabot security updates | on | Opens the fix PR automatically |
 | Branch protection on `master` | on | No force-push, no deletion, PR + green CI required |
 | Required status checks | `test (22)`, `test (24)` | A broken or unreviewed commit cannot merge |
-| Admin bypass | allowed | Solo maintainer; keeps day-to-day work unblocked |
+| Admin bypass | off | The rules bind the maintainer too: every change to `master` arrives by pull request |
 | `GITHUB_TOKEN` scope | `contents: read` | A compromised workflow step cannot write to the repo |
 | Action pinning | SHA, enforced repo-wide | A moved tag cannot silently run new code |
 | Allowed actions | selected | Only `actions/*` and `cloudflare/wrangler-action` may run |
@@ -44,6 +44,7 @@ The application itself has a small attack surface by design:
 ```bash
 gh api repos/Hassan-Memon/truerate --jq '.security_and_analysis'
 gh api repos/Hassan-Memon/truerate/branches/master/protection --jq '.required_status_checks.contexts'
+gh api repos/Hassan-Memon/truerate/branches/master/protection/enforce_admins --jq '.enabled'
 gh api repos/Hassan-Memon/truerate/actions/permissions
 curl -sI https://<deployed-host>/ | grep -i -E 'content-security|strict-transport|x-content-type'
 ```
@@ -58,15 +59,18 @@ Every third-party action is pinned to a full commit SHA with the release in a
 trailing comment. Dependabot's `github-actions` ecosystem rewrites both the SHA
 and the comment, so pins stay current without drifting.
 
-`deploy.yml` is **off by default**: it only runs when the repository variable
-`DEPLOY_ENABLED` is `true`. When you turn it on:
+`deploy.yml` runs only when the repository variable `DEPLOY_ENABLED` is `true`.
+It has been on since 2026-11-07, so every merge to `master` deploys once the
+tests pass. To pause deploys without touching the token:
 
 ```bash
-gh variable set DEPLOY_ENABLED --body true
+gh variable set DEPLOY_ENABLED --body false
 ```
 
-and create a `production` environment (Settings → Environments) with **required
-reviewers** so a push cannot deploy unattended.
+The review gate sits in front of the merge: `master` accepts no direct pushes,
+so nothing reaches production unreviewed. **Required reviewers** on the
+`production` environment (Settings → Environments) would add a second,
+deploy-time approval; that is not set today.
 
 ### Cloudflare API token
 
@@ -76,14 +80,17 @@ Scope the token to the minimum that can deploy, and nothing more:
 - Account resources: **the single account only**, not "All accounts"
 - No zone, DNS, or Workers KV permissions
 
-Store it as an environment secret on `production`, not as a repository secret:
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are stored as repository
+Actions secrets. Environment secrets on `production` are the stricter option,
+because only jobs that reference the environment can read them:
 
 ```bash
 gh secret set CLOUDFLARE_API_TOKEN --env production
 gh secret set CLOUDFLARE_ACCOUNT_ID --env production
 ```
 
-Rotate it if it is ever pasted into a terminal transcript, an issue, or a chat.
+Rotate the token if it is ever pasted into a terminal transcript, an issue, or a
+chat.
 
 ## Application headers
 
@@ -130,11 +137,15 @@ during development and adds nothing where HSTS already applies.
    need GitHub Secret Protection licensing.
 6. **No commit signing.** Low value for a single-maintainer public repo; revisit
    if contributors are added.
+7. **The deploy token is broader than the minimum.** It was created from
+   Cloudflare's "Edit Cloudflare Workers" template, which also grants KV, R2 and
+   Workers Routes on every zone. Replace it with a token that holds only
+   Workers Scripts → Edit on this account, then rotate.
 
 ## If something does leak
 
 1. Revoke the credential at the issuer first — rotating beats rewriting history.
-2. `gh secret delete <NAME> --env production` and re-set it.
+2. `gh secret delete <NAME>` and re-set it.
 3. Assume the value is public: audit the provider's logs for use.
 4. Rewriting git history does **not** remove the object from GitHub; only
    deleting the repository does. Treat any exposed secret as burned.
