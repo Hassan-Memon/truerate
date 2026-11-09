@@ -3,21 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TrueRate — what did your currency deal really cost?</title>
-  <meta name="description" content="Enter what you gave and what you received. TrueRate shows what your currency deal cost against the market rate that day, with every source shown. Your amounts stay on your device. Free, open source, no sign-up.">
+  <title>TrueRate: what did your currency deal really cost?</title>
+  <meta name="description" content="Check what a currency deal or quote really costs against the market rate that day, with every source shown. Your amounts stay on your device. Free, in English and Urdu.">
   <link rel="canonical" href="https://truerate.truerate-app.workers.dev/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="TrueRate — what did your currency deal really cost?">
-  <meta property="og:description" content="Check any currency deal against the market rate that day, in your own money. Your amounts stay on your device.">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:title" content="TrueRate: what did your currency deal really cost?">
+  <meta property="og:description" content="Check what a currency deal or quote really costs against the market rate that day, with every source shown. Your amounts stay on your device. Free, in English and Urdu.">
+  <meta property="og:site_name" content="TrueRate">
+  <meta property="og:image" content="https://truerate.truerate-app.workers.dev/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="TrueRate: this deal cost you about 4,300 PKR, 1.6%, compared with the market rate">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/styles.css">
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"WebApplication","name":"TrueRate","applicationCategory":"FinanceApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0"},"description":"Checks what a currency deal cost against the market rate that day, with every source shown."}
-  </script>
+  <link rel="modulepreload" href="/check.js">
+  <link rel="modulepreload" href="/i18n.js">
+  <!--seo-->
 </head>
 <body>
   <header class="top">
@@ -26,10 +31,9 @@
       <span>TrueRate</span>
     </a>
     <nav class="nav">
-      <a href="#check" data-i18n="nav.check">Check a deal</a>
       <a href="#ladder" data-i18n="nav.ladder">Rate ladder</a>
       <a href="#rates" data-i18n="nav.rates">Rates</a>
-      <a href="#method" data-i18n="nav.method">Method</a>
+      <a href="#faq" data-i18n="nav.faq">Questions</a>
       <button type="button" class="lang" id="lang" lang="ur" data-i18n="lang.toggle">اردو</button>
     </nav>
   </header>
@@ -37,12 +41,19 @@
   <main>
     <section class="hero" id="check">
       <h1 data-i18n="hero.title">What did your currency deal really cost you?</h1>
+      
       <p class="lede" data-i18n="hero.lede">Enter what you gave and what you received. We compare it with the market rate that day and show the cost in your own money.</p>
+      <p id="pair-summary" class="pair-summary"></p>
+      <noscript><p class="alert" data-i18n="noscript">The deal check runs in your browser, so it needs JavaScript. Your amounts are never sent to us.</p></noscript>
 
       <form class="deal card" id="deal" autocomplete="off" novalidate>
+        <fieldset class="mode">
+          <label><input type="radio" name="mode" value="done" checked> <span data-i18n="deal.mode.done">I already did this deal</span></label>
+          <label><input type="radio" name="mode" value="quote"> <span data-i18n="deal.mode.quote">I have a quote</span></label>
+        </fieldset>
         <div class="deal-row">
           <div class="field">
-            <label for="deal-gave" data-i18n="deal.gave">I gave</label>
+            <label for="deal-gave" id="gave-label" data-i18n="deal.gave">I gave</label>
             <input id="deal-gave" type="text" inputmode="decimal" dir="ltr" placeholder="1,000">
           </div>
           <div class="field">
@@ -52,7 +63,7 @@
         </div>
         <div class="deal-row">
           <div class="field">
-            <label for="deal-received" data-i18n="deal.received">I received</label>
+            <label for="deal-received" id="received-label" data-i18n="deal.received">I received</label>
             <input id="deal-received" type="text" inputmode="decimal" dir="ltr" placeholder="272,500">
           </div>
           <div class="field">
@@ -61,13 +72,14 @@
           </div>
         </div>
         <div class="deal-row">
-          <div class="field">
+          <div class="field" id="date-field">
             <label for="deal-date" data-i18n="deal.date">Date of the deal</label>
             <input id="deal-date" type="date" dir="ltr">
           </div>
           <div class="field">
             <label for="deal-channel" data-i18n="deal.channel">How did you change it?</label>
             <select id="deal-channel">
+              <option value="" data-i18n="deal.channel.choose">Choose one</option>
               <option value="remittance" data-i18n="channel.remittance">Remittance app or service</option>
               <option value="freelance" data-i18n="channel.freelance">Freelance payout (Payoneer etc.)</option>
               <option value="bank" data-i18n="channel.bank">Bank</option>
@@ -75,6 +87,10 @@
               <option value="card" data-i18n="channel.card">Card abroad</option>
             </select>
           </div>
+        </div>
+        <div class="field">
+          <label for="deal-fee" data-i18n="deal.fee">Any fee paid on top, in the currency you gave (optional)</label>
+          <input id="deal-fee" type="text" inputmode="decimal" dir="ltr" placeholder="0">
         </div>
         <button type="submit" class="primary" id="deal-submit" data-i18n="deal.submit">Check my deal</button>
         <p class="privacy small" data-i18n="deal.privacy">Your amounts stay on your device. The calculation runs in your browser and is never sent to us.</p>
@@ -184,13 +200,60 @@
           <ol class="rules">
             <li data-i18n="method.rule.1">Cost is what you would have received at the benchmark, minus what you did receive.</li>
             <li data-i18n="method.rule.2">For today we use the median of the live market feeds. For past dates we use central-bank figures for that date.</li>
-            <li data-i18n="method.rule.3">Under 1% is close to market, 1–3% is noticeable, and 3% or more is high. These bands are our judgement; 3% is the UN target for the cost of sending money home.</li>
+            <li data-i18n="method.rule.3">Under 1% is close to market, 1–3% is noticeable, 3% or more is high, and 25% or more is very high. These bands are our judgement; 3% is the UN target for the cost of sending money home.</li>
             <li data-i18n="method.rule.4">Differences inside the margin of error get no verdict.</li>
             <li data-i18n="method.rule.5">If sources split into separate groups, or a currency is documented as having more than one rate, we give no rate and no verdict.</li>
+            <li data-i18n="method.rule.cash">Cash deals get no verdict yet, because dealers publish their own prices. We show the difference from mid-market and the published dealer price we have.</li>
             <li data-i18n="method.rule.6">Figures more than three days old are marked. Unknowns say "not yet documented".</li>
           </ol>
-          <p class="small muted" data-i18n="method.notes">We show licensed channels only and never rank a provider for money. Nothing here is financial or religious advice.</p>
+          <p class="small"><a href="https://sdgs.un.org/goals/goal10" rel="noopener" data-i18n="method.un">UN target 10.c</a></p>
+          <p class="small muted" data-i18n="method.notes">No ads, no referral income and no paid placement. Nothing here is financial or religious advice.</p>
         </div>
+      </div>
+    </section>
+
+    <section id="faq" class="section">
+      <h2 data-i18n="faq.title">Common questions</h2>
+      <div class="card">
+        <details class="qa"><summary data-i18n="faq.why.q">Why is the rate I got different from the one on Google?</summary><p data-i18n="faq.why.a">Websites usually show a mid-market rate, a reference figure between buying and selling prices. Banks, apps and money changers quote you their own rate around it, so the rate you get will normally be different.</p></details>
+        <details class="qa"><summary data-i18n="faq.interbank.q">What is the interbank rate in Pakistan?</summary><p data-i18n="faq.interbank.a">It is the price at which banks trade dollars with each other through brokers. The State Bank of Pakistan publishes a daily closing average. Customers do not trade at it directly: banks and exchange companies quote their own rates.</p></details>
+        <details class="qa"><summary data-i18n="faq.cost.q">How do you work out what my deal cost?</summary><p data-i18n="faq.cost.a">We multiply what you gave, including any fee, by the benchmark rate for that date, then subtract what you received. We also state the margin of error, and give no verdict when the difference is inside it.</p></details>
+        <details class="qa"><summary data-i18n="faq.privacy.q">Do you see or store my amounts?</summary><p data-i18n="faq.privacy.a">No. Your browser asks us only for the rate for a currency pair and a date, then does the calculation itself. Your amounts are not sent to us and nothing is stored.</p></details>
+        <details class="qa"><summary data-i18n="faq.cash.q">Why is there no verdict on cash deals?</summary><p data-i18n="faq.cash.a">Cash dealers publish their own buying and selling prices on either side of the mid-market rate, so comparing them with that rate can make a poor deal look fair. Until we have fresh dealer prices, we show the difference and no verdict.</p></details>
+      </div>
+    </section>
+
+    <section id="pairs" class="section">
+      <h2 data-i18n="pairs.title">Popular pairs</h2>
+      <nav class="pairs" aria-label="Popular currency pairs" dir="ltr">
+          <a data-pair href="/usd-to-pkr">USD → PKR</a>
+          <a data-pair href="/sar-to-pkr">SAR → PKR</a>
+          <a data-pair href="/aed-to-pkr">AED → PKR</a>
+          <a data-pair href="/gbp-to-pkr">GBP → PKR</a>
+          <a data-pair href="/eur-to-pkr">EUR → PKR</a>
+          <a data-pair href="/cad-to-pkr">CAD → PKR</a>
+          <a data-pair href="/aud-to-pkr">AUD → PKR</a>
+          <a data-pair href="/qar-to-pkr">QAR → PKR</a>
+          <a data-pair href="/omr-to-pkr">OMR → PKR</a>
+          <a data-pair href="/kwd-to-pkr">KWD → PKR</a>
+          <a data-pair href="/pkr-to-usd">PKR → USD</a>
+          <a data-pair href="/pkr-to-sar">PKR → SAR</a>
+          <a data-pair href="/usd-to-inr">USD → INR</a>
+          <a data-pair href="/sar-to-inr">SAR → INR</a>
+          <a data-pair href="/aed-to-inr">AED → INR</a>
+          <a data-pair href="/usd-to-bdt">USD → BDT</a>
+          <a data-pair href="/sar-to-bdt">SAR → BDT</a>
+          <a data-pair href="/usd-to-eur">USD → EUR</a>
+          <a data-pair href="/eur-to-usd">EUR → USD</a>
+          <a data-pair href="/gbp-to-usd">GBP → USD</a>
+      </nav>
+    </section>
+
+    <section id="about" class="section">
+      <h2 data-i18n="about.title">Who runs this</h2>
+      <div class="card">
+        <p data-i18n="about.body">TrueRate is a personal, open-source project by Hassan Memon in Karachi, built with AI-assisted coding. It has no ads, no referral income and no paid placement, and it does not sell or recommend any provider.</p>
+        <p class="small"><a href="https://github.com/Hassan-Memon/truerate" rel="noopener" data-i18n="about.code">Read the code</a> · <a href="https://github.com/Hassan-Memon/truerate/issues" rel="noopener" data-i18n="about.issue">Report a mistake</a></p>
       </div>
     </section>
 
@@ -211,7 +274,7 @@ GET /api/history?from=USD&amp;to=PKR&amp;days=90</code></pre>
 
   <footer class="foot">
     <p id="updated" class="muted small"></p>
-    <p class="small muted" data-i18n="foot.data">Data: ExchangeRate-API, Currency-API, FloatRates, MoneyConvert, central banks via Frankfurter, and published documents of the State Bank of Pakistan. Rates are informational, not financial advice.</p>
+    <p class="small muted"><span data-i18n="foot.links">Rates by</span> <a href="https://github.com/fawazahmed0/exchange-api" rel="noopener">Currency-API</a>, <a href="https://www.floatrates.com/" rel="noopener">FloatRates</a>, <a href="https://frankfurter.dev/" rel="noopener">Frankfurter</a> (central banks), <a href="https://www.sbp.org.pk/economic-data" rel="noopener">State Bank of Pakistan</a>. <span data-i18n="foot.data">Rates are informational, not financial advice.</span></p>
     <p class="small muted"><span data-i18n="foot.source">Open source under the MIT licence.</span> <a href="https://github.com/Hassan-Memon/truerate" rel="noopener" data-i18n="foot.contribute">Correct us or add a source</a></p>
   </footer>
 

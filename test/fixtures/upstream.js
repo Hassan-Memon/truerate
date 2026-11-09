@@ -2,10 +2,11 @@
  * Recorded-shape fixtures for every upstream TrueRate talks to, plus a fake `fetch`
  * that routes by URL. Numbers are chosen so the expected medians/spreads are easy to check by hand.
  *
- * USD/PKR by source:  erapi 280, fawaz 281, floatrates 279, moneyconvert 282  -> median 280.5
- * USD/SAR by source:  erapi 3.75, fawaz 3.76, floatrates 3.74, moneyconvert 3.75 -> median 3.75
- * USD/EUR by source:  erapi 0.92, fawaz 0.921, floatrates 0.919, moneyconvert 0.92 -> median 0.92
- * USD/JPY: erapi + fawaz only (two sources)
+ * USD/PKR by source:  fawaz 281, floatrates 279  -> median 280
+ * USD/SAR by source:  fawaz 3.76, floatrates 3.74 -> median 3.75
+ * USD/EUR by source:  fawaz 0.921, floatrates 0.919 -> median 0.92
+ * USD/JPY by source:  fawaz 151, floatrates 150 -> median 150.5
+ * USD/SYP splits (13000 and 122). USD/KPW agrees at 150 while central banks say 900.
  */
 const DAY = 86400e3;
 
@@ -13,15 +14,9 @@ export function marketPayloads(now = Date.now()) {
   const iso = new Date(now - 3600e3).toISOString(); // an hour ago: fresh
   const ymd = iso.slice(0, 10);
   return {
-    erapi: {
-      result: 'success',
-      time_last_update_unix: Math.floor((now - 3600e3) / 1000),
-      base_code: 'USD',
-      rates: { USD: 1, PKR: 280, SAR: 3.75, EUR: 0.92, JPY: 150, XYZ: 5, SYP: 122, MMK: 2100, CAD: 1.40 },
-    },
     fawaz: {
       date: ymd,
-      usd: { usd: 1, pkr: 281, sar: 3.76, eur: 0.921, jpy: 151, btc: 0.00001, bad: 'x', syp: 13000, mmk: 2100, cad: 1.41 },
+      usd: { usd: 1, pkr: 281, sar: 3.76, eur: 0.921, jpy: 151, btc: 0.00001, bad: 'x', syp: 13000, mmk: 2100, cad: 1.41, kpw: 150 },
     },
     floatrates: {
       pkr: { code: 'PKR', rate: 279, date: new Date(now - 3600e3).toUTCString() },
@@ -29,12 +24,10 @@ export function marketPayloads(now = Date.now()) {
       eur: { code: 'EUR', rate: 0.919, date: new Date(now - 3600e3).toUTCString() },
       syp: { code: 'SYP', rate: 122, date: new Date(now - 3600e3).toUTCString() },
       cad: { code: 'CAD', rate: 1.40, date: new Date(now - 3600e3).toUTCString() },
+      jpy: { code: 'JPY', rate: 150, date: new Date(now - 3600e3).toUTCString() },
+      mmk: { code: 'MMK', rate: 2100, date: new Date(now - 3600e3).toUTCString() },
+      kpw: { code: 'KPW', rate: 150, date: new Date(now - 3600e3).toUTCString() },
       zzz: { code: 'zz', rate: 1, date: 'garbage' },
-    },
-    moneyconvert: {
-      base: 'USD',
-      rates: { USD: 1, PKR: 282, SAR: '3.75', EUR: 0.92, NEG: -1, SYP: 13000, CAD: 2.8 },
-      lastModified: new Date(now - 600e3).toUTCString(),
     },
   };
 }
@@ -65,6 +58,7 @@ export function officialPayloads(now = Date.now()) {
         { key: 'FED', rate: 283, date: today },
         { key: 'ODD', rate: 0, date: today },
       ] },
+      { date: today, base: 'USD', quote: 'KPW', rate: 900, providers: [{ key: 'FED', rate: 900, date: today }] },
       { date: today, base: 'USD', quote: 'xx', rate: 1, providers: [] },
     ],
     // /v2/rates?base=usd&providers=SBP: the issuing bank's own (month-old) figures.
@@ -96,13 +90,8 @@ export function makeFetch({ now = Date.now(), fail = [], calls = [] } = {}) {
     const u = String(url);
     calls.push(u);
     if (fail.some((f) => u.includes(f))) return respond({ error: 'down' }, { status: 503 });
-    if (u.startsWith('https://open.er-api.com/')) return respond(m.erapi);
     if (u.includes('currency-api')) return respond(m.fawaz);
     if (u.startsWith('https://www.floatrates.com/')) return respond(m.floatrates);
-    if (u.startsWith('https://cdn.moneyconvert.net/')) {
-      const { lastModified, ...body } = m.moneyconvert;
-      return respond(body, { headers: { 'last-modified': lastModified } });
-    }
     if (u === 'https://api.frankfurter.dev/v2/providers') return respond(o.providers);
     if (u.includes('frankfurter.dev/v2/rates') && u.includes('expand=providers')) return respond(o.rates);
     if (u.includes('frankfurter.dev/v2/rates') && u.includes('providers=SBP')) return respond(o.sbp);

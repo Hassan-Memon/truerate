@@ -46,11 +46,48 @@ test('pair pages have their own metadata in the raw HTML', async () => {
   const page = await fetch(base + '/sar-to-pkr');
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /<title>SAR to PKR: /);
+  assert.match(html, /<title>SAR to PKR/);
+  assert.match(html, /<h1[^>]*>What did your SAR to PKR deal really cost you\?<\/h1>/);
   assert.match(html, /<link rel="canonical" href="[^"]*\/sar-to-pkr"/);
-  assert.match(html, /property="og:title" content="SAR to PKR: /);
+  assert.match(html, /property="og:title" content="SAR to PKR/);
   const legacy = await (await fetch(base + '/?from=SAR&to=PKR')).text();
-  assert.match(legacy, /<title>SAR to PKR: /);
+  assert.match(legacy, /<title>SAR to PKR/);
+});
+
+test('Urdu pages are real pages, in Urdu before any script runs', async () => {
+  const r = await fetch(base + '/ur/sar-to-pkr');
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /<html lang="ur" dir="rtl">/);
+  assert.match(html, /<title>SAR سے PKR/);
+  assert.match(html, /میرا سودا جانچیں/);
+  assert.match(html, /<link rel="canonical" href="[^"]*\/ur\/sar-to-pkr"/);
+  assert.match(html, /data-pair href="\/ur\/usd-to-pkr"/);
+  assert.equal((await fetch(base + '/ur')).status, 200);
+  const missing = await fetch(base + '/ur/nonsense');
+  assert.equal(missing.status, 404);
+  await missing.text();
+});
+
+test('every page says which language versions exist and carries valid structured data', async () => {
+  for (const p of ['/', '/ur', '/usd-to-pkr']) {
+    const html = await (await fetch(base + p)).text();
+    assert.match(html, /hreflang="en"/, p);
+    assert.match(html, /hreflang="ur"/, p);
+    assert.match(html, /hreflang="x-default"/, p);
+    assert.ok(!html.includes('<!--seo-->'), p);
+    const data = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1]);
+    const types = data['@graph'].map((g) => g['@type']);
+    assert.ok(types.includes('WebApplication') && types.includes('FAQPage'), p);
+    assert.equal(types.includes('BreadcrumbList'), p === '/usd-to-pkr', p);
+  }
+});
+
+test('the share image is served as a real image', async () => {
+  const r = await fetch(base + '/og.png');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /image\/png/);
+  assert.ok((await r.arrayBuffer()).byteLength > 1000);
 });
 
 test('unknown paths are real 404s, never the app with a 200', async () => {

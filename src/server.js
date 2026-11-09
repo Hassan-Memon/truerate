@@ -6,9 +6,9 @@ import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleApi } from './api.js';
+import { handleApi, publishableRate } from './api.js';
 import { SECURITY_HEADERS } from './core/headers.js';
-import { pairFromUrl, renderPairHtml } from './core/pages.js';
+import { routeFromUrl, renderPage } from './core/pages.js';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -55,11 +55,12 @@ async function handle(req, res) {
     res.writeHead(out.status, { ...SECURITY_HEADERS, ...headers, 'content-length': body.length });
     return res.end(req.method === 'HEAD' ? undefined : body);
   }
-  const pair = pairFromUrl(url);
-  if (pair) {
+  const route = routeFromUrl(url);
+  if (route) {
     const html = await readFile(join(PUBLIC, 'index.html'), 'utf8');
+    const rate = route.pair ? await publishableRate(route.pair.from, route.pair.to) : null;
     res.writeHead(200, { ...SECURITY_HEADERS, 'content-type': TYPES['.html'], 'cache-control': 'public, max-age=60' });
-    return res.end(renderPairHtml(html, pair));
+    return res.end(renderPage(html, route, { rate }));
   }
   return serveStatic(url.pathname, res);
 }

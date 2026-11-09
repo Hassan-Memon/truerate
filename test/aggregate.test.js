@@ -53,29 +53,29 @@ test('agreementFor: missing central bank costs 5 points', () => {
 test('snapshot: consensus is the median of market feeds, with spread and official view', async () => {
   const s = await snapshot();
   const pkr = s.currencies.PKR;
-  assert.equal(pkr.rate, 280.5);
-  assert.equal(pkr.market.n, 4);
+  assert.equal(pkr.rate, 280);
+  assert.equal(pkr.market.n, 2);
   assert.equal(pkr.market.min, 279);
-  assert.equal(pkr.market.max, 282);
-  assert.equal(pkr.market.spreadPct, round((3 / 280.5) * 100, 4));
+  assert.equal(pkr.market.max, 281);
+  assert.equal(pkr.market.spreadPct, round((2 / 280) * 100, 4));
   assert.equal(pkr.official.rate, 283);
-  assert.equal(pkr.gapPct, round(((283 - 280.5) / 280.5) * 100, 4));
-  near(pkr.inverse, 1 / 280.5);
+  assert.equal(pkr.gapPct, round(((283 - 280) / 280) * 100, 4));
+  near(pkr.inverse, 1 / 280);
   // per-source deviation from consensus
-  const mc = pkr.market.quotes.find((q) => q.source === 'moneyconvert');
-  assert.equal(mc.devPct, round(((282 - 280.5) / 280.5) * 100, 4));
-  // agreement: 4 sources (0), spread 1.0695% (-16.04), gap 0.89% (-3.57) -> 80
-  assert.equal(pkr.agreement.score, 80);
-  assert.equal(pkr.agreement.label, 'strong');
-  assert.deepEqual(pkr.agreement.reasons, ['sources disagree by 1.07%']);
+  const fz = pkr.market.quotes.find((q) => q.source === 'fawaz');
+  assert.equal(fz.devPct, round(((281 - 280) / 280) * 100, 4));
+  // agreement: 2 sources (-15), spread 0.7143% (-10.71), gap 1.0714% (-4.29) -> 70
+  assert.equal(pkr.agreement.score, 70);
+  assert.equal(pkr.agreement.label, 'partial');
+  assert.deepEqual(pkr.agreement.reasons, ['only two market sources', 'official rate is 1.07% above market']);
 });
 
 test('snapshot: metadata, feed status and sources', async () => {
   const s = await snapshot();
   assert.equal(s.base, 'USD');
   assert.equal(s.generatedAt, new Date(NOW).toISOString());
-  assert.deepEqual(s.feeds, { market: 4, marketTotal: 4, official: true });
-  assert.equal(s.sources.length, 5);
+  assert.deepEqual(s.feeds, { market: 2, marketTotal: 2, official: true });
+  assert.equal(s.sources.length, 3);
   for (const src of s.sources) assert.equal(src.rates, undefined, 'raw rates are not leaked into sources');
   assert.equal(s.sources.at(-1).quotes, undefined);
   assert.equal(s.providerCount, 5);
@@ -95,7 +95,7 @@ test('snapshot: only known fiat currencies are tracked', async () => {
 test('snapshot: USD is 1 everywhere', async () => {
   const s = await snapshot();
   assert.equal(s.currencies.USD.rate, 1);
-  assert.equal(s.currencies.USD.market.n, 4);
+  assert.equal(s.currencies.USD.market.n, 2);
   assert.equal(s.currencies.USD.market.spreadPct, 0);
   assert.equal(s.currencies.USD.official.rate, 1);
 });
@@ -138,11 +138,11 @@ test('snapshot: stale market sources are counted', async () => {
   const fetchImpl = makeFetch({ now: NOW - 3 * 86400e3 });
   const [market, official] = await Promise.all([loadMarketSources({ fetchImpl }), loadOfficial({ fetchImpl })]);
   const s = buildSnapshot({ market, official, now: NOW });
-  assert.ok(s.currencies.PKR.agreement.reasons.includes('4 sources older than 48h'));
+  assert.ok(s.currencies.PKR.agreement.reasons.includes('2 sources older than 48h'));
 });
 
 test('snapshot: falls back to official rate when no market feed is up', async () => {
-  const s = await snapshot({ fail: ['er-api', 'currency-api', 'floatrates', 'moneyconvert'] });
+  const s = await snapshot({ fail: ['currency-api', 'floatrates'] });
   assert.equal(s.feeds.market, 0);
   assert.equal(s.currencies.PKR.rate, 283);
   assert.equal(s.currencies.PKR.market, null);
@@ -153,7 +153,7 @@ test('snapshot: falls back to official rate when no market feed is up', async ()
 test('snapshot: market-only when the central-bank feed is down', async () => {
   const s = await snapshot({ fail: ['frankfurter'] });
   assert.equal(s.feeds.official, false);
-  assert.equal(s.currencies.PKR.rate, 280.5);
+  assert.equal(s.currencies.PKR.rate, 280);
   assert.equal(s.currencies.PKR.official, null);
   assert.equal(s.currencies.USD.official, null);
 });
@@ -163,9 +163,9 @@ test('snapshot: market-only when the central-bank feed is down', async () => {
 test('pairDetail: cross rates are built per source, then the median is taken', async () => {
   const s = await snapshot();
   const d = pairDetail(s, 'PKR', 'SAR');
-  const perSource = { erapi: 3.75 / 280, fawaz: 3.76 / 281, floatrates: 3.74 / 279, moneyconvert: 3.75 / 282 };
+  const perSource = { fawaz: 3.76 / 281, floatrates: 3.74 / 279 };
   const vals = Object.values(perSource);
-  assert.equal(d.market.n, 4);
+  assert.equal(d.market.n, 2);
   near(d.rate, median(vals));
   near(d.market.spreadPct, spreadPct(vals), 1e-3);
   for (const q of d.market.quotes) near(q.rate, perSource[q.source]);
@@ -196,7 +196,7 @@ test('pairDetail: USD on either side uses each institution\'s quote directly', a
   assert.equal(b.official.rate, sig(1 / 0.9205, 8));
   assert.equal(b.official.quotes.find((q) => q.key === 'ECB').rate, sig(1 / 0.9204, 8));
   assert.equal(b.official.homes[0].side, 'from');
-  near(b.rate, 1 / 0.92);
+  near(b.rate, median([1 / 0.921, 1 / 0.919]));
 });
 
 test('pairDetail: identical legs give exactly 1', async () => {
@@ -217,10 +217,10 @@ test('ratesTable: USD base matches the snapshot', async () => {
   const s = await snapshot();
   const t = ratesTable(s, 'USD');
   assert.equal(t.base, 'USD');
-  assert.equal(t.rates.PKR.rate, 280.5);
+  assert.equal(t.rates.PKR.rate, 280);
   assert.equal(t.rates.PKR.spreadPct, s.currencies.PKR.market.spreadPct);
   assert.equal(t.rates.PKR.official, 283);
-  assert.equal(t.rates.PKR.sources, 4);
+  assert.equal(t.rates.PKR.sources, 2);
   assert.equal(t.rates.PKR.score, s.currencies.PKR.agreement.score);
   assert.equal(t.rates.USD.rate, 1);
 });
@@ -241,7 +241,7 @@ test('ratesTable: no official column when the base has no central-bank quote', a
   const t = ratesTable(await snapshot(), 'JPY');
   assert.equal(t.rates.EUR.official, null);
   assert.equal(t.rates.PKR.official, null);
-  near(t.rates.PKR.rate, median([280 / 150, 281 / 151]));
+  near(t.rates.PKR.rate, median([279 / 150, 281 / 151]));
 });
 
 test('ratesTable: memoised per snapshot and base; unknown base is null', async () => {

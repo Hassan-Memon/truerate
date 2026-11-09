@@ -43,8 +43,8 @@ test('GET /api/currencies returns metadata for every tracked currency', async ()
 test('GET /api/pair returns full detail, including the stale issuing bank', async () => {
   const { status, body, res } = await get('/api/pair?from=usd&to=pkr');
   assert.equal(status, 200);
-  assert.equal(body.rate, 280.5);
-  assert.equal(body.market.n, 4);
+  assert.equal(body.rate, 280);
+  assert.equal(body.market.n, 2);
   assert.equal(body.official.rate, 283);
   const sbp = body.official.homes.find((h) => h.key === 'SBP');
   assert.ok(sbp, 'SBP attached from its own provider feed');
@@ -72,12 +72,12 @@ test('snapshot is fetched once and shared across requests', async () => {
 test('GET /api/convert multiplies through and gives the low/high band', async () => {
   const { body } = await get('/api/convert?from=USD&to=PKR&amount=100');
   assert.equal(body.amount, 100);
-  assert.equal(body.rate, 280.5);
-  assert.equal(body.result, 28050);
+  assert.equal(body.rate, 280);
+  assert.equal(body.result, 28000);
   assert.equal(body.low, 27900);
-  assert.equal(body.high, 28200);
+  assert.equal(body.high, 28100);
   assert.equal(body.official, 28300);
-  assert.equal(body.agreement.label, 'strong');
+  assert.equal(body.agreement.label, 'partial');
 });
 
 test('GET /api/convert rejects a bad amount', async () => {
@@ -93,8 +93,8 @@ test('GET /api/rates rebases the table', async () => {
   assert.equal(status, 200);
   assert.equal(body.base, 'PKR');
   assert.equal(body.rates.PKR.rate, 1);
-  // Built per source (1/280, 1/281, 1/279, 1/282), then the median: not simply 1/280.5.
-  const expected = (1 / 280 + 1 / 281) / 2;
+  // Built per source (1/281, 1/279), then the median: not simply 1/280.
+  const expected = (1 / 281 + 1 / 279) / 2;
   assert.ok(Math.abs(body.rates.USD.rate - expected) < 1e-9, `${body.rates.USD.rate} vs ${expected}`);
 });
 
@@ -115,7 +115,7 @@ test('GET /api/history clamps days', async () => {
 
 test('GET /api/sources reports upstream health', async () => {
   const { body } = await get('/api/sources');
-  assert.equal(body.sources.length, 5);
+  assert.equal(body.sources.length, 3);
   assert.ok(body.sources.every((s) => s.ok));
   assert.equal(body.providerCount, 5);
   assert.equal(body.ttlSeconds, 300);
@@ -152,7 +152,7 @@ test('methods: OPTIONS is a CORS preflight, POST is refused, HEAD works', async 
 });
 
 test('every upstream down gives 503, not a crash', async () => {
-  const opts = { fetchImpl: makeFetch({ fail: ['er-api', 'currency-api', 'floatrates', 'moneyconvert', 'frankfurter'] }) };
+  const opts = { fetchImpl: makeFetch({ fail: ['currency-api', 'floatrates', 'frankfurter'] }) };
   const { status, body, res } = await get('/api/pair', { opts });
   assert.equal(status, 503);
   assert.match(body.detail, /every upstream source failed/);
@@ -163,7 +163,7 @@ test('central-bank feed down: pair still answers from the market, and says so', 
   const opts = { fetchImpl: makeFetch({ fail: ['frankfurter'] }) };
   const { status, body } = await get('/api/pair?from=USD&to=PKR', { opts });
   assert.equal(status, 200);
-  assert.equal(body.rate, 280.5);
+  assert.equal(body.rate, 280);
   assert.equal(body.official, null);
   assert.equal(body.feeds.official, false);
   assert.ok(body.agreement.reasons.includes('no central-bank quote to cross-check'));

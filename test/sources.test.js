@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMarketSources, fetchJson, MARKET_SOURCES } from '../src/core/sources.js';
 import { loadOfficial, homeProvider } from '../src/core/official.js';
-import { makeFetch, marketPayloads } from './fixtures/upstream.js';
+import { makeFetch } from './fixtures/upstream.js';
 
 const NOW = Date.parse('2026-11-04T12:00:00Z');
 
@@ -17,14 +17,10 @@ test('every market adapter parses its upstream shape', async () => {
     assert.ok(!Number.isNaN(Date.parse(s.asOf)), `${s.id} asOf`);
     assert.equal(s.count, Object.keys(s.rates).length);
   }
-  assert.equal(by.erapi.rates.PKR, 280);
   assert.equal(by.fawaz.rates.PKR, 281, 'lower-case codes are upper-cased');
   assert.equal(by.fawaz.rates.BAD, undefined, 'non-numeric values are dropped');
   assert.equal(by.floatrates.rates.SAR, 3.74, 'string rates are parsed');
   assert.equal(by.floatrates.rates.ZZ, undefined, 'malformed codes are dropped');
-  assert.equal(by.moneyconvert.rates.NEG, undefined, 'non-positive rates are dropped');
-  assert.equal(by.moneyconvert.asOf, new Date(marketPayloads(NOW).moneyconvert.lastModified).toISOString(), 'asOf comes from Last-Modified');
-  assert.equal(by.erapi.asOf, new Date(Math.floor((NOW - 3600e3) / 1000) * 1000).toISOString());
 });
 
 test('a failing adapter is recorded, never thrown', async () => {
@@ -33,7 +29,7 @@ test('a failing adapter is recorded, never thrown', async () => {
   assert.equal(fr.ok, false);
   assert.match(fr.error, /HTTP 503/);
   assert.deepEqual(fr.rates, {});
-  assert.equal(out.filter((s) => s.ok).length, 3);
+  assert.equal(out.filter((s) => s.ok).length, 1);
 });
 
 test('Currency-API falls back to its pages.dev mirror when jsDelivr fails', async () => {
@@ -43,11 +39,10 @@ test('Currency-API falls back to its pages.dev mirror when jsDelivr fails', asyn
   assert.ok(calls.some((u) => u.includes('currency-api.pages.dev')));
 });
 
-test('ExchangeRate-API rejects a non-success payload', async () => {
-  const fetchImpl = async () => new Response(JSON.stringify({ result: 'error' }), { status: 200 });
-  const [er] = await loadMarketSources({ fetchImpl }, MARKET_SOURCES.filter((s) => s.id === 'erapi'));
-  assert.equal(er.ok, false);
-  assert.match(er.error, /bad result/);
+test('feeds whose terms forbid redistribution stay out', () => {
+  const ids = MARKET_SOURCES.map((s) => s.id);
+  assert.ok(!ids.includes('erapi'), 'ExchangeRate-API forbids services offering programmatic access');
+  assert.ok(!ids.includes('moneyconvert'), 'MoneyConvert forbids redistribution without consent');
 });
 
 test('fetchJson times out', async () => {

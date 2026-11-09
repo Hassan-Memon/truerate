@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assessDeal, aboutRound, parseAmount, channelContext } from '../public/check.js';
 import { STRINGS, translator } from '../public/i18n.js';
-import { handleApi, resetCache } from '../src/api.js';
+import { handleApi, resetCache, publishableRate } from '../src/api.js';
 import { buildSnapshot, pairDetail, ratesTable } from '../src/core/aggregate.js';
-import { gradeBenchmark, historyPointFor, ladderFor } from '../src/core/benchmark.js';
+import { gradeBenchmark, historyPointFor, ladderFor, weekRangePct } from '../src/core/benchmark.js';
 import { loadMarketSources } from '../src/core/sources.js';
 import { loadOfficial } from '../src/core/official.js';
 import { rateGroups } from '../src/core/stats.js';
@@ -14,7 +14,7 @@ import LADDERS from '../src/core/ladders.json' with { type: 'json' };
 import { makeFetch } from './fixtures/upstream.js';
 
 const NOW = Date.parse('2026-11-04T12:00:00Z');
-const bench = (rate = 276.8, marginPct = 0.25, grade = 'cross-checked') => ({ rate, marginPct, grade });
+const bench = (rate = 276.8, marginPct = 0.25, grade = 'sources-agree') => ({ rate, marginPct, grade });
 const assess = (gave, received, from = 'USD', to = 'PKR', b = bench()) => assessDeal({ gave, received, from, to, benchmark: b });
 
 async function snapshot(now = NOW) {
@@ -55,7 +55,7 @@ test('a split currency has no rate, and says so, instead of averaging the two gr
   assert.equal(syp.noConsensus, true);
   assert.equal(syp.market.median, null);
   assert.equal(syp.agreement.label, 'split');
-  assert.deepEqual(syp.market.groups.map((g) => g.n), [2, 2]);
+  assert.deepEqual(syp.market.groups.map((g) => g.n), [1, 1]);
 
   const d = pairDetail(s, 'USD', 'SYP');
   assert.equal(d.rate, null);
@@ -80,10 +80,14 @@ test('/api/convert returns no result for a split pair rather than a made-up one'
   assert.equal(body.result, null);
 });
 
-test('one outlier feed does not block the consensus', async () => {
-  const cad = (await snapshot()).currencies.CAD;
-  assert.equal(cad.noConsensus, false);
-  assert.equal(cad.rate, 1.405);
+test('feeds that agree with each other but not with central banks are no consensus either', async () => {
+  const s = await snapshot();
+  assert.equal(s.currencies.KPW.rate, null);
+  assert.equal(s.currencies.KPW.noConsensus, true);
+  const d = pairDetail(s, 'USD', 'KPW');
+  assert.equal(d.rate, null);
+  assert.deepEqual(d.market.groups.map((g) => g.min), [150, 900]);
+  assert.equal(gradeBenchmark(d).grade, 'none');
 });
 
 /* ---------- agreement is not trust ---------- */
@@ -98,7 +102,7 @@ test('a documented multi-rate currency gets no benchmark, however well its feeds
 
 test('gradeBenchmark: agreement across kinds, one kind, a wide gap, a conflict', () => {
   const base = { from: { code: 'USD' }, to: { code: 'PKR' }, market: { spreadPct: 0.1 }, official: { rate: 1 }, gapPct: 0.1 };
-  assert.equal(gradeBenchmark(base).grade, 'cross-checked');
+  assert.equal(gradeBenchmark(base).grade, 'sources-agree');
   assert.deepEqual(gradeBenchmark({ ...base, official: null, gapPct: null }), { grade: 'limited', reason: 'single-kind' });
   assert.deepEqual(gradeBenchmark({ ...base, gapPct: 2 }), { grade: 'limited', reason: 'wide' });
   assert.deepEqual(gradeBenchmark({ ...base, market: { spreadPct: 3 } }), { grade: 'limited', reason: 'wide' });
@@ -136,12 +140,12 @@ test('a quote more than three days old is marked stale', async () => {
 test('benchmark today uses the live market median, with a margin', async () => {
   const { status, body } = await get('/api/benchmark?from=USD&to=PKR');
   assert.equal(status, 200);
-  assert.equal(body.rate, 280.5);
+  assert.equal(body.rate, 280);
   assert.equal(body.source, 'market-median');
   assert.equal(body.low, 279);
   assert.equal(body.high, 283);
-  assert.ok(Math.abs(body.marginPct - (4 / 280.5) * 50) < 1e-9);
-  assert.equal(body.grade, 'cross-checked');
+  assert.ok(Math.abs(body.marginPct - (4 / 280) * 50) < 1e-9);
+  assert.equal(body.grade, 'sources-agree');
 });
 
 test('benchmark for a past date uses the last published rate on or before it', async () => {
@@ -185,6 +189,23 @@ test('benchmark accepts tomorrow in UTC, because it is already tomorrow in Karac
   assert.equal(body.source, 'market-median');
 });
 
+test('a past-date margin grows with how much the pair moved that week', () => {
+  assert.equal(weekRangePct([{ date: 'a', rate: 100 }]), 0);
+  assert.ok(Math.abs(weekRangePct([{ date: 'a', rate: 90 }, { date: 'b', rate: 110 }]) - 10) < 1e-9);
+});
+
+test('a page never publishes a rate it would not stand behind', async () => {
+  assert.equal(await publishableRate('USD', 'PKR', { fetchImpl }), 280);
+  assert.equal(await publishableRate('USD', 'MMK', { fetchImpl }), null, 'documented multi-rate');
+  assert.equal(await publishableRate('USD', 'SYP', { fetchImpl }), null, 'split feeds');
+  resetCache();
+  const down = makeFetch({ fail: ['currency-api', 'floatrates', 'frankfurter'] });
+  assert.equal(await publishableRate('USD', 'PKR', { fetchImpl: down }), null, 'upstream down still renders a page');
+  resetCache();
+  const hang = () => new Promise(() => {});
+  assert.equal(await publishableRate('USD', 'PKR', { fetchImpl: hang }, 10), null, 'a slow upstream cannot hold the page');
+});
+
 test('historyPointFor ignores later dates and points over a week old', () => {
   const pts = [{ date: '2026-10-01', rate: 1 }, { date: '2026-10-05', rate: 2 }];
   assert.equal(historyPointFor(pts, '2026-10-04').rate, 1);
@@ -214,13 +235,44 @@ test('assessDeal: the verdict bands', () => {
   assert.equal(assess(1000, 277800).status, 'better');
 });
 
-test('assessDeal: a wide margin refuses to judge what it cannot see', () => {
-  assert.equal(assess(1000, 272500, 'USD', 'PKR', bench(276.8, 2)).status, 'about-market');
+test('assessDeal: a wide margin says it cannot tell, never "about the market rate"', () => {
+  assert.equal(assess(1000, 272500, 'USD', 'PKR', bench(276.8, 2)).status, 'uncertain');
+  assert.equal(assess(1000, 249120, 'USD', 'SDG', bench(276.8, 11.8)).status, 'uncertain', 'a 10% loss inside an 11.8% margin');
+  assert.equal(assess(1000, 276500, 'USD', 'PKR', bench(276.8, 1)).status, 'about-market', 'a margin of 1% can still say so');
 });
 
-test('assessDeal: a likely typing mistake gets no verdict', () => {
+test('assessDeal: fees count, because leaving them out flatters the deal', () => {
+  const without = assessDeal({ gave: 1000, received: 276000, from: 'USD', to: 'PKR', benchmark: bench() });
+  const withFee = assessDeal({ gave: 1000, fee: 15, received: 276000, from: 'USD', to: 'PKR', benchmark: bench() });
+  assert.equal(without.status, 'close');
+  assert.equal(withFee.status, 'noticeable');
+  assert.equal(withFee.total, 1015);
+  assert.ok(Math.abs(withFee.cost - (1015 * 276.8 - 276000)) < 1e-6);
+});
+
+test('assessDeal: cash deals get no verdict, however close they look', () => {
+  for (const received of [277350, 276500, 275850, 268000]) {
+    const v = assessDeal({ gave: 1000, received, from: 'USD', to: 'PKR', channel: 'exchange', benchmark: bench() });
+    assert.equal(v.status, 'cash', String(received));
+    assert.ok(Number.isFinite(v.cost), 'the difference is still shown');
+  }
+});
+
+test('assessDeal: a quote with no amount received gives marks to judge it by', () => {
+  const v = assessDeal({ gave: 1000, received: null, from: 'USD', to: 'PKR', channel: 'bank', benchmark: bench() });
+  assert.equal(v.status, 'estimate');
+  assert.equal(v.expected, 276800);
+  assert.ok(Math.abs(v.at1 - 274032) < 1e-6);
+  assert.ok(Math.abs(v.at3 - 268496) < 1e-6);
+});
+
+test('assessDeal: a likely typing mistake gets no verdict, but a real rip-off still shows its cost', () => {
   assert.equal(assess(1000, 272).status, 'implausible');
   assert.equal(assess(1000, 2725000).status, 'implausible');
+  assert.equal(assess(1000, 400000).status, 'implausible', 'far more than the market is a mistake');
+  const ripoff = assess(1000, 193800);
+  assert.equal(ripoff.status, 'extreme');
+  assert.ok(ripoff.displayCost > 80000);
 });
 
 test('assessDeal: no benchmark means no verdict and no numbers', () => {
@@ -240,6 +292,7 @@ test('aboutRound and parseAmount', () => {
   assert.equal(aboutRound(12345), 12000);
   assert.equal(aboutRound(-987), -990);
   assert.equal(aboutRound(0), 0);
+  assert.equal(aboutRound(276858, 3), 277000, 'an estimate keeps enough figures to be useful');
   assert.equal(parseAmount('272,500'), 272500);
   assert.equal(parseAmount(' 1 000.5 '), 1000.5);
   for (const bad of ['', 'abc', '0', '-5', null]) assert.equal(parseAmount(bad), null, String(bad));
@@ -330,13 +383,13 @@ test('every data-i18n key in the page exists', () => {
 test('translator fills placeholders and falls back to English', () => {
   assert.equal(translator('en')('src.live', { n: 4 }), '4 live');
   assert.match(translator('ur')('src.live', { n: 4 }), /4/);
-  assert.equal(translator('xx')('nav.check'), 'Check a deal');
+  assert.equal(translator('xx')('nav.rates'), 'Rates');
   assert.equal(translator('en')('no.such.key'), 'no.such.key');
 });
 
 test('the old overclaims are gone from the page', () => {
   const page = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8') + JSON.stringify(STRINGS.en);
-  for (const claim of [/independent/i, /authoritative/i, /one honest rate/i, /trust score/i, /high trust/i]) {
+  for (const claim of [/independent/i, /authoritative/i, /one honest rate/i, /trust score/i, /high trust/i, /cross-checked/i, /licensed channels/i, /ExchangeRate-API/i, /MoneyConvert/i]) {
     assert.ok(!claim.test(page), String(claim));
   }
 });

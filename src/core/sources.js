@@ -1,5 +1,9 @@
 /**
  * Market-reference sources. Each publishes USD-based mid rates, free of charge, no API key.
+ *
+ * Check a feed's terms before adding it: this site offers an open API, so a feed that forbids
+ * redistribution or programmatic access cannot be used. ExchangeRate-API's open endpoint and
+ * MoneyConvert both forbid it, and were removed for that reason.
  * Every adapter returns { rates: {CODE: number}, asOf: ISO string } or throws.
  */
 const TIMEOUT_MS = 8000;
@@ -27,18 +31,6 @@ function clean(obj) {
 
 export const MARKET_SOURCES = [
   {
-    id: 'erapi',
-    name: 'ExchangeRate-API (open)',
-    homepage: 'https://www.exchangerate-api.com/docs/free',
-    kind: 'market',
-    cadence: 'daily',
-    async load(o) {
-      const { body } = await fetchJson('https://open.er-api.com/v6/latest/USD', o);
-      if (body.result !== 'success') throw new Error('bad result');
-      return { rates: clean(body.rates), asOf: new Date(body.time_last_update_unix * 1000).toISOString() };
-    },
-  },
-  {
     id: 'fawaz',
     name: 'Currency-API (fawazahmed0)',
     homepage: 'https://github.com/fawazahmed0/exchange-api',
@@ -59,7 +51,7 @@ export const MARKET_SOURCES = [
     name: 'FloatRates',
     homepage: 'https://www.floatrates.com/json-feeds.html',
     kind: 'market',
-    cadence: 'hourly',
+    cadence: 'twice a day',
     async load(o) {
       const { body } = await fetchJson('https://www.floatrates.com/daily/usd.json', o);
       const rates = {};
@@ -71,19 +63,6 @@ export const MARKET_SOURCES = [
         if (d > latest) latest = d;
       }
       return { rates, asOf: new Date(latest || Date.now()).toISOString() };
-    },
-  },
-  {
-    id: 'moneyconvert',
-    name: 'MoneyConvert',
-    homepage: 'https://moneyconvert.net/',
-    kind: 'market',
-    cadence: '5 min',
-    async load(o) {
-      const { body, headers } = await fetchJson('https://cdn.moneyconvert.net/api/latest.json', o);
-      if (body.base !== 'USD') throw new Error('unexpected base');
-      const lm = headers.get('last-modified');
-      return { rates: clean(body.rates), asOf: new Date(lm ? Date.parse(lm) : Date.now()).toISOString() };
     },
   },
 ];

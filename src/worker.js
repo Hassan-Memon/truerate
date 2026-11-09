@@ -2,9 +2,9 @@
  * Cloudflare Worker entry. Static files come from the free Workers Assets binding;
  * /api/* runs the same handler as the Node server. Fits inside the free plan.
  */
-import { handleApi } from './api.js';
+import { handleApi, publishableRate } from './api.js';
 import { withSecurityHeaders } from './core/headers.js';
-import { pairFromUrl, renderPairHtml } from './core/pages.js';
+import { routeFromUrl, renderPage } from './core/pages.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -20,10 +20,11 @@ export default {
       if (request.method === 'GET' && res.status === 200) ctx.waitUntil(cache.put(key, res.clone()));
       return res;
     }
-    const pair = pairFromUrl(url);
-    if (pair) {
+    const route = routeFromUrl(url);
+    if (route) {
       const page = await env.ASSETS.fetch(new Request(new URL('/', url)));
-      return withSecurityHeaders(new Response(renderPairHtml(await page.text(), pair), {
+      const rate = route.pair ? await publishableRate(route.pair.from, route.pair.to) : null;
+      return withSecurityHeaders(new Response(renderPage(await page.text(), route, { rate }), {
         status: page.status,
         headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' },
       }));
