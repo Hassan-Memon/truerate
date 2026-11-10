@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://truerate.truerate-app.workers.dev/sitemap.xml
+Sitemap: https://truerate.hassan-memon.workers.dev/sitemap.xml

@@ -6,7 +6,7 @@
 import CURRENCIES from './currencies.json' with { type: 'json' };
 import { translator, FAQ_IDS } from '../../public/i18n.js';
 
-export const SITE = 'https://truerate.truerate-app.workers.dev';
+export const SITE = 'https://truerate.hassan-memon.workers.dev';
 
 /** Which page does this URL ask for? null means it is not a page: an asset, or a 404. */
 export function routeFromUrl(url) {

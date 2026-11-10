@@ -4,7 +4,7 @@
 
 Enter what you gave and what you received. TrueRate shows the cost against the market rate that day, in your own money, with every source shown. Your amounts never leave your device. Free, no sign-up, in English and Urdu.
 
-**[Try it: truerate.truerate-app.workers.dev](https://truerate.truerate-app.workers.dev)** · [اردو میں](https://truerate.truerate-app.workers.dev/ur)
+**[Try it: truerate.hassan-memon.workers.dev](https://truerate.hassan-memon.workers.dev)** · [اردو میں](https://truerate.hassan-memon.workers.dev/ur)
 
 [![CI](https://github.com/Hassan-Memon/truerate/actions/workflows/ci.yml/badge.svg)](https://github.com/Hassan-Memon/truerate/actions/workflows/ci.yml) [![Deploy](https://github.com/Hassan-Memon/truerate/actions/workflows/deploy.yml/badge.svg)](https://github.com/Hassan-Memon/truerate/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
