@@ -4,7 +4,7 @@
  */
 import { writeFileSync } from 'node:fs';
 
-const SITE = 'https://truerate.truerate-app.workers.dev';
+const SITE = 'https://truerate.hassan-memon.workers.dev';
 const TO_PKR = ['usd', 'sar', 'aed', 'gbp', 'eur', 'cad', 'aud', 'qar', 'omr', 'kwd', 'bhd', 'myr'];
 const PAIRS = [
   ...TO_PKR.map((c) => `${c}-to-pkr`),
